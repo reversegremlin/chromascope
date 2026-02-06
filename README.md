@@ -55,7 +55,7 @@ A premium web-based interface designed for musicians:
 - **Waveform timeline** with visual playhead
 - **One-click export** to HD video
 
-![Kaleidoscope Studio Interface](docs/screenshots/studio-ui.png)
+![Kaleidoscope Studio Interface](docs/studio-screenshot.png)
 
 ## Quick Start
 
