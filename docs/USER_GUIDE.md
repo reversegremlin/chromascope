@@ -134,8 +134,9 @@ python frontend/server.py
 
 The Studio is divided into three main areas:
 
-**Left Panel - Audio & Geometry**
+**Left Panel - Audio, Style & Geometry**
 - **Audio Source**: Drag & drop or click to load audio files
+- **Style**: Choose visualization style (Geometric, Glass, Flower, Spiral)
 - **Geometry**: Control mirrors (radial symmetry), size, orbit distance, and rotation speed
 - **Dynamics**: Adjust punch intensity, motion trails, and envelope settings
 
@@ -149,6 +150,19 @@ The Studio is divided into three main areas:
 - **Colors**: Accent color, chroma-based coloring, saturation
 - **Background**: Two-color gradients, particles, pulse rings, reactivity
 - **Export**: Resolution, frame rate, and video export options
+
+### Visualization Styles
+
+The Studio includes four distinct visualization styles, each with its own character:
+
+| Style | Description | Best For |
+|-------|-------------|----------|
+| **Geometric** | Orbiting polygons with radial symmetry | Electronic, EDM, clean beats |
+| **Glass** | Classic broken glass kaleidoscope with triangular reflections | Rock, orchestral, complex audio |
+| **Flower** | Organic petal shapes with smooth bezier curves | Ambient, acoustic, soft music |
+| **Spiral** | Hypnotic spiraling arms with flowing motion | Trance, progressive, buildups |
+
+Click any style button to switch instantly - changes apply in real-time during playback.
 
 ### Fullscreen Mode
 

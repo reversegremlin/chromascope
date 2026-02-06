@@ -31,8 +31,16 @@ This engine tries to *understand* the character of music by separating **percuss
 
 ### The Kaleidoscope Visualizer
 
-Built-in geometric visualizer that maps audio features to transformations:
+Built-in visualizer with **four distinct styles**, each mapping audio features to unique transformations:
 
+| Style | Description |
+|-------|-------------|
+| **Geometric** | Orbiting polygons with radial symmetry - the classic look |
+| **Glass** | Broken glass kaleidoscope with triangular reflections and angular shards |
+| **Flower** | Organic petal shapes radiating in layers with bezier curves |
+| **Spiral** | Hypnotic arms spiraling outward with flowing motion |
+
+**Audio-to-Visual Mapping:**
 - **Percussive Impact** → Shape pulsing (drums cause shapes to "kick")
 - **Harmonic Energy** → Rotation speed (melodies drive smooth motion)
 - **Spectral Brightness** → Polygon complexity (3 sides → 12 sides)
@@ -40,7 +48,7 @@ Built-in geometric visualizer that maps audio features to transformations:
 
 **Dynamic Background Effects:**
 - Gradient oscillation between two colors based on harmonic energy
-- Floating particles that react to beats and energy levels
+- Floating particles that react to energy levels
 - Expanding pulse rings on beat hits
 - Smooth vignette for cinematic depth
 - Fully configurable reactivity and color palette
