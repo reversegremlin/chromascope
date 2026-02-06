@@ -5,6 +5,9 @@
 *.flac
 *.m4a
 *.ogg
+*.mp4
+*.avi
+*.mov
 
 # Exclude large exported manifests/data
 # (Only commit small mock_manifest.json for testing)
