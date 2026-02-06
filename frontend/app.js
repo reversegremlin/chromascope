@@ -652,65 +652,66 @@ class KaleidoscopeStudio {
         const color1 = this.hexToRgb(config.bgColor);
         const color2 = this.hexToRgb(config.bgColor2);
 
-        // Smooth, slow gradient blend based on harmonic energy
-        const blendPhase = Math.sin(this.bgState.gradientAngle) * 0.5 + 0.5;
-        const energyBlend = this.smoothedValues.harmonicEnergy * reactivity * 0.3;
-        const blend = blendPhase * 0.4 + energyBlend;
+        // Use a separate, even slower smoothed value just for background color
+        // This prevents any connection to beat-related values
+        if (this._bgColorBlend === undefined) {
+            this._bgColorBlend = 0.3;
+        }
+        // Extremely slow color blend - practically imperceptible frame to frame
+        const targetBlend = 0.3 + this.smoothedValues.harmonicEnergy * reactivity * 0.3;
+        this._bgColorBlend = this.lerp(this._bgColorBlend, targetBlend, 0.001);
+        const blend = this._bgColorBlend;
 
-        // Gentle center movement
-        const centerX = width / 2 + Math.sin(this.bgState.gradientAngle * 2) * width * 0.05 * reactivity;
-        const centerY = height / 2 + Math.cos(this.bgState.gradientAngle * 1.5) * height * 0.05 * reactivity;
+        // Fixed center - no movement
+        const centerX = width / 2;
+        const centerY = height / 2;
 
-        // Subtle pulse radius on beats
-        const pulseExpand = this.bgState.pulseIntensity * 100 * reactivity;
-        const baseRadius = Math.max(width, height) * 0.9;
-        const outerRadius = baseRadius + pulseExpand;
+        // Stable radius
+        const baseRadius = Math.max(width, height) * 0.95;
 
-        // Create gradient
+        // Create simple radial gradient
         const gradient = ctx.createRadialGradient(
             centerX, centerY, 0,
-            centerX, centerY, outerRadius
+            centerX, centerY, baseRadius
         );
 
-        // Interpolate colors smoothly
+        // Interpolate colors based on the ultra-slow blend value
         const midColor = {
             r: Math.round(color1.r + (color2.r - color1.r) * blend),
             g: Math.round(color1.g + (color2.g - color1.g) * blend),
             b: Math.round(color1.b + (color2.b - color1.b) * blend)
         };
 
-        // Subtle brightness boost on beats (much gentler)
-        const brightnessBoost = this.bgState.pulseIntensity * 15 * reactivity;
-        gradient.addColorStop(0, `rgb(${Math.min(255, midColor.r + brightnessBoost)}, ${Math.min(255, midColor.g + brightnessBoost)}, ${Math.min(255, midColor.b + brightnessBoost)})`);
-        gradient.addColorStop(0.4, `rgb(${midColor.r}, ${midColor.g}, ${midColor.b})`);
+        gradient.addColorStop(0, `rgb(${midColor.r}, ${midColor.g}, ${midColor.b})`);
+        gradient.addColorStop(0.6, `rgb(${Math.round(midColor.r * 0.7 + color1.r * 0.3)}, ${Math.round(midColor.g * 0.7 + color1.g * 0.3)}, ${Math.round(midColor.b * 0.7 + color1.b * 0.3)})`);
         gradient.addColorStop(1, `rgb(${color1.r}, ${color1.g}, ${color1.b})`);
 
-        // Gentle fade for trails - lower alpha = more trail persistence
+        // Fixed fade amount for consistent trails (not reactive)
         const fadeAmount = (100 - config.trailAlpha) / 100;
-        ctx.globalAlpha = fadeAmount * 0.15 + 0.02;
+        ctx.globalAlpha = fadeAmount * 0.06 + 0.01; // Slightly reduced for smoother trails
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, height);
 
-        // Subtle vignette
+        // Static vignette
         const vignetteGradient = ctx.createRadialGradient(
-            width / 2, height / 2, height * 0.4,
-            width / 2, height / 2, Math.max(width, height) * 0.85
+            centerX, centerY, height * 0.35,
+            centerX, centerY, Math.max(width, height) * 0.85
         );
         vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
-        ctx.globalAlpha = 0.2;
+        vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.35)');
+        ctx.globalAlpha = 0.15;
         ctx.fillStyle = vignetteGradient;
         ctx.fillRect(0, 0, width, height);
 
         ctx.globalAlpha = 1;
 
-        // Render particles if enabled
+        // Render particles if enabled (these move gently)
         if (config.bgParticles) {
             this.renderParticles(deltaTime);
         }
 
-        // Render pulse rings on beats (only when visible)
-        if (config.bgPulse && this.bgState.pulseIntensity > 0.05) {
+        // Render pulse rings on beats only
+        if (config.bgPulse && this.bgState.pulseIntensity > 0.1) {
             this.renderPulseRings();
         }
     }
@@ -722,14 +723,15 @@ class KaleidoscopeStudio {
         const config = this.config;
 
         const reactivity = config.bgReactivity / 100;
-        const energyBoost = 1 + this.smoothedValues.harmonicEnergy * reactivity;
+        // Use harmonic energy for smooth motion, not percussive
+        const energyBoost = 1 + this.smoothedValues.harmonicEnergy * reactivity * 0.3;
 
         ctx.save();
 
         this.bgState.particles.forEach(particle => {
-            // Update position gently
-            particle.x += Math.cos(particle.angle) * particle.speed * deltaTime * 0.03 * energyBoost;
-            particle.y += Math.sin(particle.angle) * particle.speed * deltaTime * 0.03 * energyBoost;
+            // Update position gently - constant slow drift
+            particle.x += Math.cos(particle.angle) * particle.speed * deltaTime * 0.02 * energyBoost;
+            particle.y += Math.sin(particle.angle) * particle.speed * deltaTime * 0.02 * energyBoost;
 
             // Wrap around edges
             if (particle.x < 0) particle.x = width;
@@ -737,28 +739,24 @@ class KaleidoscopeStudio {
             if (particle.y < 0) particle.y = height;
             if (particle.y > height) particle.y = 0;
 
-            // Gentle pulse brightness
-            particle.pulse += deltaTime * 0.002;
-            const pulseBrightness = Math.sin(particle.pulse) * 0.2 + 0.8;
-            const beatBrightness = 1 + this.bgState.pulseIntensity * 0.3;
+            // Gentle pulse brightness - slow sine wave only, no beat response
+            particle.pulse += deltaTime * 0.001;
+            const pulseBrightness = Math.sin(particle.pulse) * 0.15 + 0.85;
 
-            // Draw particle - subtle
-            const alpha = particle.brightness * pulseBrightness * beatBrightness * reactivity * 0.6;
-            const size = particle.size * (1 + this.smoothedValues.percussiveImpact * 0.3);
+            // Draw particle - subtle and consistent
+            const alpha = particle.brightness * pulseBrightness * reactivity * 0.5;
+            const size = particle.size; // Fixed size, no beat reaction
 
             ctx.beginPath();
             ctx.arc(particle.x, particle.y, size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.5, alpha)})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.4, alpha)})`;
             ctx.fill();
 
-            // Subtle glow on high energy only
-            if (this.smoothedValues.percussiveImpact > 0.6) {
-                ctx.beginPath();
-                ctx.arc(particle.x, particle.y, size * 2.5, 0, Math.PI * 2);
-                const glowAlpha = (this.smoothedValues.percussiveImpact - 0.6) * alpha * 0.15;
-                ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.2, glowAlpha)})`;
-                ctx.fill();
-            }
+            // Very subtle glow always present
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, size * 2, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.08, alpha * 0.15)})`;
+            ctx.fill();
         });
 
         ctx.restore();
@@ -772,27 +770,27 @@ class KaleidoscopeStudio {
 
         const centerX = width / 2;
         const centerY = height / 2;
-        const maxRadius = Math.max(width, height) * 0.5;
+        const maxRadius = Math.max(width, height) * 0.4;
 
-        // Subtle expanding rings
-        const numRings = 2;
-        const baseAlpha = this.bgState.pulseIntensity * 0.08;
+        // Very subtle expanding ring - single ring only
+        const baseAlpha = this.bgState.pulseIntensity * 0.04; // Very subtle
+
+        if (baseAlpha < 0.005) return; // Skip if too faint
 
         ctx.save();
 
-        for (let i = 0; i < numRings; i++) {
-            const phase = (1 - this.bgState.pulseIntensity + i * 0.3) % 1;
-            const radius = phase * maxRadius;
-            const alpha = baseAlpha * (1 - phase * phase); // Quadratic falloff
+        // Single expanding ring
+        const phase = 1 - this.bgState.pulseIntensity;
+        const radius = phase * maxRadius;
+        const alpha = baseAlpha * (1 - phase); // Linear falloff
 
-            if (alpha > 0.005 && radius > 10) {
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                ctx.strokeStyle = config.accentColor;
-                ctx.lineWidth = 1.5;
-                ctx.globalAlpha = alpha;
-                ctx.stroke();
-            }
+        if (radius > 10) {
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = config.accentColor;
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = alpha;
+            ctx.stroke();
         }
 
         ctx.restore();
@@ -824,30 +822,36 @@ class KaleidoscopeStudio {
             };
         }
 
-        // Smooth all incoming values for fluid motion
-        const smoothFactor = Math.min(1, deltaTime * 0.008); // Time-based smoothing
+        // Smooth all incoming values for fluid motion - very gradual changes
+        const smoothFactor = Math.min(1, deltaTime * 0.002); // Even slower smoothing
+
+        // Percussive impact: shapes respond to beats, but not the background
         this.smoothedValues.percussiveImpact = this.lerp(
             this.smoothedValues.percussiveImpact,
             frameData.percussive_impact,
-            frameData.is_beat ? 0.5 : smoothFactor // Faster response on beats
+            frameData.is_beat ? 0.15 : smoothFactor * 2 // Gentler beat response
         );
+
+        // Harmonic energy: very slow changes for background stability
         this.smoothedValues.harmonicEnergy = this.lerp(
             this.smoothedValues.harmonicEnergy,
             frameData.harmonic_energy,
-            smoothFactor * 0.5
+            smoothFactor * 0.15 // Ultra slow for background
         );
+
+        // Spectral brightness: slow changes
         this.smoothedValues.spectralBrightness = this.lerp(
             this.smoothedValues.spectralBrightness,
             frameData.spectral_brightness,
-            smoothFactor * 0.3
+            smoothFactor * 0.2
         );
 
         // Update background state
         this.bgState.gradientAngle += deltaTime * 0.00008 * (1 + this.smoothedValues.harmonicEnergy * 0.5);
 
-        // Smoother pulse - faster decay, gentler attack
-        const targetPulse = frameData.is_beat ? 0.6 : 0;
-        const pulseLerp = frameData.is_beat ? 0.3 : 0.08;
+        // Pulse rings only - much gentler, doesn't affect background color
+        const targetPulse = frameData.is_beat ? 0.4 : 0;
+        const pulseLerp = frameData.is_beat ? 0.1 : 0.05; // Very gentle attack and decay
         this.bgState.pulseIntensity = this.lerp(this.bgState.pulseIntensity, targetPulse, pulseLerp);
 
         this.bgState.noiseOffset += deltaTime * 0.01;
