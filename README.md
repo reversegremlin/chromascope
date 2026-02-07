@@ -3,11 +3,9 @@
 A high-fidelity audio analysis engine that extracts musical features for reactive generative art. Transform any audio into stunning, music-driven visualizations.
 
 <p align="center">
-  <img src="docs/preview.gif" alt="Kaleidoscope Visualization Demo" width="480">
+  <img src="docs/preview.png" alt="Kaleidoscope Visualization Demo" width="600">
   <br>
   <em>Real-time audio-reactive kaleidoscope visualization</em>
-  <br>
-  <a href="docs/teaser.mp4">▶️ Watch full demo with audio</a>
 </p>
 
 ```
@@ -35,12 +33,12 @@ Built-in visualizer with **six distinct styles**, each mapping audio features to
 
 | Style | Description | Preview |
 |-------|-------------|---------|
-| **Geometric** | Orbiting polygons with radial symmetry | ![Geometric](docs/demos/preview_geometric.gif) |
-| **Glass** | Broken glass with triangular reflections | ![Glass](docs/demos/preview_glass.gif) |
-| **Flower** | Organic petal shapes with bezier curves | ![Flower](docs/demos/preview_flower.gif) |
-| **Spiral** | Hypnotic spiraling arms with flowing motion | ![Spiral](docs/demos/preview_spiral.gif) |
-| **Circuit** | Hexagonal grid with glowing circuit traces | ![Circuit](docs/demos/preview_circuit.gif) |
-| **Fibonacci** | Golden ratio spirals with mathematical harmony | ![Fibonacci](docs/demos/preview_fibonacci.gif) |
+| **Geometric** | Orbiting polygons with radial symmetry | ![Geometric](docs/demos/preview_geometric.png) |
+| **Glass** | Broken glass with triangular reflections | ![Glass](docs/demos/preview_glass.png) |
+| **Flower** | Organic petal shapes with bezier curves | ![Flower](docs/demos/preview_flower.png) |
+| **Spiral** | Hypnotic spiraling arms with flowing motion | ![Spiral](docs/demos/preview_spiral.png) |
+| **Circuit** | Hexagonal grid with glowing circuit traces | ![Circuit](docs/demos/preview_circuit.png) |
+| **Fibonacci** | Golden ratio spirals with mathematical harmony | ![Fibonacci](docs/demos/preview_fibonacci.png) |
 
 **Audio-to-Visual Mapping:**
 - **Percussive Impact** → Shape pulsing (drums cause shapes to "kick")
