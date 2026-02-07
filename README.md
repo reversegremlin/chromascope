@@ -31,16 +31,16 @@ This engine tries to *understand* the character of music by separating **percuss
 
 ### The Kaleidoscope Visualizer
 
-Built-in visualizer with **four distinct styles**, each mapping audio features to unique transformations:
+Built-in visualizer with **six distinct styles**, each mapping audio features to unique transformations:
 
-| Style | Description |
-|-------|-------------|
-| **Geometric** | Orbiting polygons with radial symmetry - the classic look |
-| **Glass** | Broken glass kaleidoscope with triangular reflections and angular shards |
-| **Flower** | Organic petal shapes radiating in layers with bezier curves |
-| **Spiral** | Hypnotic arms spiraling outward with flowing motion |
-| **Circuit** | Hexagonal grid with glowing circuit traces and pulsing energy nodes |
-| **Fibonacci** | Golden ratio spirals and nested rectangles with mathematical harmony |
+| Style | Description | Preview |
+|-------|-------------|---------|
+| **Geometric** | Orbiting polygons with radial symmetry | ![Geometric](docs/demos/preview_geometric.gif) |
+| **Glass** | Broken glass with triangular reflections | ![Glass](docs/demos/preview_glass.gif) |
+| **Flower** | Organic petal shapes with bezier curves | ![Flower](docs/demos/preview_flower.gif) |
+| **Spiral** | Hypnotic spiraling arms with flowing motion | ![Spiral](docs/demos/preview_spiral.gif) |
+| **Circuit** | Hexagonal grid with glowing circuit traces | ![Circuit](docs/demos/preview_circuit.gif) |
+| **Fibonacci** | Golden ratio spirals with mathematical harmony | ![Fibonacci](docs/demos/preview_fibonacci.gif) |
 
 **Audio-to-Visual Mapping:**
 - **Percussive Impact** → Shape pulsing (drums cause shapes to "kick")
