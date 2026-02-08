@@ -158,11 +158,11 @@ The Studio includes six distinct visualization styles, each with its own charact
 | Style | Description | Best For |
 |-------|-------------|----------|
 | **Geometric** | Orbiting polygons with radial symmetry | Electronic, EDM, clean beats |
-| **Glass** | Classic broken glass kaleidoscope with triangular reflections | Rock, orchestral, complex audio |
+| **Glass** | Faceted kaleidoscope with gem-like tessellation, prismatic light rays, and internal reflections | Rock, orchestral, complex audio |
 | **Flower** | Organic petal shapes with smooth bezier curves | Ambient, acoustic, soft music |
 | **Spiral** | Hypnotic spiraling arms with flowing motion | Trance, progressive, buildups |
 | **Circuit** | Hexagonal grid with glowing circuit traces and nodes | Synthwave, cyberpunk, industrial |
-| **Fibonacci** | Golden ratio spirals with mathematical harmony | Classical, jazz, contemplative |
+| **Fibonacci** | Golden spiral meets kaleidoscope with phyllotaxis patterns, sacred geometry, and Fibonacci-numbered petal rings | Classical, jazz, contemplative |
 
 Click any style button to switch instantly - changes apply in real-time during playback.
 

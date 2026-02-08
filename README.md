@@ -34,11 +34,11 @@ Built-in visualizer with **six distinct styles**, each mapping audio features to
 | Style | Description | Preview |
 |-------|-------------|---------|
 | **Geometric** | Orbiting polygons with radial symmetry | ![Geometric](docs/demos/preview_geometric.png) |
-| **Glass** | Broken glass with triangular reflections | ![Glass](docs/demos/preview_glass.png) |
+| **Glass** | Faceted kaleidoscope with gem tessellation and prismatic rays | ![Glass](docs/demos/preview_glass.png) |
 | **Flower** | Organic petal shapes with bezier curves | ![Flower](docs/demos/preview_flower.png) |
 | **Spiral** | Hypnotic spiraling arms with flowing motion | ![Spiral](docs/demos/preview_spiral.png) |
 | **Circuit** | Hexagonal grid with glowing circuit traces | ![Circuit](docs/demos/preview_circuit.png) |
-| **Fibonacci** | Golden ratio spirals with mathematical harmony | ![Fibonacci](docs/demos/preview_fibonacci.png) |
+| **Fibonacci** | Golden spiral meets kaleidoscope with phyllotaxis patterns | ![Fibonacci](docs/demos/preview_fibonacci.png) |
 
 **Audio-to-Visual Mapping:**
 - **Percussive Impact** → Shape pulsing (drums cause shapes to "kick")
@@ -47,6 +47,8 @@ Built-in visualizer with **six distinct styles**, each mapping audio features to
 - **Dominant Pitch** → Hue colors (musical notes map to spectrum)
 
 **Dynamic Background Effects:**
+- Full-screen fractal kaleidoscope patterns that expand across the entire viewport
+- Expanding radial geometry with mirrored triangles and polygon rings
 - Gradient oscillation between two colors based on harmonic energy
 - Floating particles that react to energy levels
 - Expanding pulse rings on beat hits
