@@ -8,7 +8,7 @@ class KaleidoscopeStudio {
         // Configuration state
         this.config = {
             // Style
-            style: 'geometric', // geometric, glass, flower, spiral
+            style: 'geometric', // geometric, glass, flower, spiral, circuit, fibonacci, dmt, sacred, mycelial, fluid
             shapeSeed: Math.floor(Math.random() * 10000), // Random seed for shape generation
             glassSlices: 30, // Number of shape slices in Glass style (10-60)
             // Geometry
@@ -911,8 +911,8 @@ class KaleidoscopeStudio {
         // Reset alpha before drawing fractal background
         ctx.globalAlpha = 1;
 
-        // --- Full-screen fractal kaleidoscope background pattern ---
-        this.renderFractalBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime);
+        // --- Full-screen style-specific background pattern ---
+        this.renderStyledBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime);
 
         // Vignette
         const vignetteGradient = ctx.createRadialGradient(
@@ -939,148 +939,1242 @@ class KaleidoscopeStudio {
     }
 
     /**
-     * Full-screen fractal kaleidoscope background
-     * Draws expanding, mirrored geometric patterns that fill the entire viewport
+     * Style-aware background dispatcher
+     * Routes to unique background renderer per visualization style
      */
-    renderFractalBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime) {
+    renderStyledBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime) {
+        if (this._bgFractalRotation === undefined) {
+            this._bgFractalRotation = 0;
+        }
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        this._bgFractalRotation += deltaTime * 0.00004 * (1 + harmonic * reactivity * 0.5);
+
+        switch (this.config.style) {
+            case 'glass':
+                this.renderGlassBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'flower':
+                this.renderFlowerBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'spiral':
+                this.renderSpiralBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'circuit':
+                this.renderCircuitBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'fibonacci':
+                this.renderFibonacciBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'dmt':
+                this.renderDMTBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'sacred':
+                this.renderSacredBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'mycelial':
+                this.renderMycelialBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            case 'fluid':
+                this.renderFluidBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+            default:
+                this.renderGeometricBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
+        }
+    }
+
+    /**
+     * Geometric background — Concentric polygon rings with radial guides
+     * 3 parallax layers: polygon rings (far), radial lines (mid), floating polygons (near)
+     */
+    renderGeometricBackground(ctx, width, height, centerX, centerY, reactivity) {
         const config = this.config;
         const energy = this.smoothedValues.percussiveImpact;
         const harmonic = this.smoothedValues.harmonicEnergy;
         const brightness = this.smoothedValues.spectralBrightness;
         const mirrors = config.mirrors;
         const maxDim = Math.max(width, height) * 0.75;
-
-        // Track background rotation separately for smooth movement
-        if (this._bgFractalRotation === undefined) {
-            this._bgFractalRotation = 0;
-        }
-        this._bgFractalRotation += deltaTime * 0.00004 * (1 + harmonic * reactivity * 0.5);
-
-        // Get accent hue for background pattern
+        const rot = this._bgFractalRotation;
         const accentHsl = this.hexToHsl(config.accentColor);
         const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
 
+        // --- FAR LAYER (0.3x): Concentric polygon rings ---
         ctx.save();
         ctx.translate(centerX, centerY);
-        ctx.rotate(this._bgFractalRotation);
+        ctx.rotate(rot * 0.3);
 
-        // Background pattern opacity - visible but not overpowering
-        const baseAlpha = 0.08 + reactivity * 0.12 + energy * reactivity * 0.1;
-
-        // --- Ring 1: Outer expanding radial lines ---
-        const outerSegments = mirrors * 2;
-        for (let i = 0; i < outerSegments; i++) {
-            const angle = (Math.PI * 2 * i) / outerSegments;
-            const lineHue = (bgHue + i * (180 / outerSegments) + harmonic * 20) % 360;
-
-            ctx.beginPath();
-            ctx.moveTo(
-                Math.cos(angle) * maxDim * 0.35,
-                Math.sin(angle) * maxDim * 0.35
-            );
-            ctx.lineTo(
-                Math.cos(angle) * maxDim * 1.2,
-                Math.sin(angle) * maxDim * 1.2
-            );
-
-            ctx.strokeStyle = `hsla(${lineHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha})`;
-            ctx.lineWidth = 1.5 + energy * reactivity * 3;
-            ctx.stroke();
-        }
-
-        // --- Ring 2: Expanding polygon rings at different radii ---
-        const ringCount = 4;
+        const ringCount = 7;
         for (let r = 0; r < ringCount; r++) {
-            const ringRadius = maxDim * (0.3 + r * 0.25) * (0.9 + energy * reactivity * 0.15);
-            const ringSides = mirrors * (r % 2 === 0 ? 1 : 2);
-            const ringRotation = this._bgFractalRotation * (r % 2 === 0 ? 1.5 : -1) + r * 0.3;
-            const ringHue = (bgHue + r * 40 + brightness * 15) % 360;
-
-            ctx.save();
-            ctx.rotate(ringRotation);
+            const ringRadius = maxDim * (0.2 + r * 0.18) * (0.9 + energy * reactivity * 0.1);
+            const ringSides = mirrors;
+            const ringHue = (bgHue + r * 25 + brightness * 15) % 360;
 
             ctx.beginPath();
             for (let i = 0; i <= ringSides; i++) {
                 const angle = (Math.PI * 2 * i) / ringSides;
-                // Add subtle wobble for organic feel
-                const wobble = Math.sin(angle * 3 + this._bgFractalRotation * 5) * maxDim * 0.01 * energy * reactivity;
+                const wobble = Math.sin(angle * 3 + rot * 5) * maxDim * 0.008 * energy * reactivity;
                 const px = Math.cos(angle) * (ringRadius + wobble);
                 const py = Math.sin(angle) * (ringRadius + wobble);
                 i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
             }
-
-            ctx.strokeStyle = `hsla(${ringHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * (1 - r * 0.1)})`;
-            ctx.lineWidth = 1.2 + energy * reactivity * 2;
-            ctx.stroke();
-
-            ctx.restore();
-        }
-
-        // --- Ring 3: Fractal mirrored triangles expanding outward ---
-        const fractalLayers = 3;
-        for (let layer = 0; layer < fractalLayers; layer++) {
-            const layerBaseRadius = maxDim * (0.4 + layer * 0.3);
-            const layerTriangles = mirrors * (layer + 1);
-            const layerRotation = this._bgFractalRotation * (1 + layer * 0.5) * (layer % 2 === 0 ? 1 : -1);
-            const triSize = maxDim * (0.08 - layer * 0.015) * (0.8 + energy * reactivity * 0.4);
-
-            ctx.save();
-            ctx.rotate(layerRotation);
-
-            for (let t = 0; t < layerTriangles; t++) {
-                const angle = (Math.PI * 2 * t) / layerTriangles;
-                const tx = Math.cos(angle) * layerBaseRadius;
-                const ty = Math.sin(angle) * layerBaseRadius;
-                const triHue = (bgHue + t * (120 / layerTriangles) + layer * 30) % 360;
-
-                ctx.save();
-                ctx.translate(tx, ty);
-                ctx.rotate(angle + this._bgFractalRotation * 2);
-
-                ctx.beginPath();
-                ctx.moveTo(0, -triSize);
-                ctx.lineTo(triSize * 0.866, triSize * 0.5);
-                ctx.lineTo(-triSize * 0.866, triSize * 0.5);
-                ctx.closePath();
-
-                ctx.strokeStyle = `hsla(${triHue}, ${config.saturation * 0.4}%, 55%, ${baseAlpha * (0.9 - layer * 0.1)})`;
-                ctx.lineWidth = 1 + energy * reactivity * 1.5;
-                ctx.stroke();
-
-                ctx.restore();
-            }
-
-            ctx.restore();
-        }
-
-        // --- Ring 4: Subtle connecting arcs between segments ---
-        const arcCount = mirrors;
-        const arcRadius = maxDim * 0.55 * (0.9 + harmonic * reactivity * 0.2);
-        ctx.save();
-        ctx.rotate(-this._bgFractalRotation * 0.7);
-
-        for (let a = 0; a < arcCount; a++) {
-            const startAngle = (Math.PI * 2 * a) / arcCount;
-            const endAngle = startAngle + Math.PI / arcCount;
-            const arcHue = (bgHue + a * (360 / arcCount) + brightness * 20) % 360;
-
-            ctx.beginPath();
-            ctx.arc(0, 0, arcRadius, startAngle, endAngle);
-            ctx.strokeStyle = `hsla(${arcHue}, ${config.saturation * 0.4}%, 55%, ${baseAlpha * 0.8})`;
-            ctx.lineWidth = 1.2 + energy * reactivity * 1.5;
-            ctx.stroke();
-
-            // Mirror arc at inner radius
-            const innerArcRadius = arcRadius * 0.6;
-            ctx.beginPath();
-            ctx.arc(0, 0, innerArcRadius, startAngle + Math.PI / arcCount / 2, endAngle + Math.PI / arcCount / 2);
-            ctx.strokeStyle = `hsla(${(arcHue + 30) % 360}, ${config.saturation * 0.35}%, 55%, ${baseAlpha * 0.6})`;
-            ctx.lineWidth = 1 + energy * reactivity;
+            ctx.strokeStyle = `hsla(${ringHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * (1 - r * 0.08)})`;
+            ctx.lineWidth = 0.8 + energy * reactivity * 1.5;
             ctx.stroke();
         }
-
         ctx.restore();
 
+        // --- MID LAYER (0.7x, counter-rotate): Radial guide lines ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.7);
+
+        const guideCount = mirrors * 3;
+        for (let i = 0; i < guideCount; i++) {
+            const angle = (Math.PI * 2 * i) / guideCount;
+            const lineHue = (bgHue + i * (120 / guideCount) + harmonic * 20) % 360;
+            const breathe = 0.9 + Math.sin(rot * 3 + i * 0.5) * 0.1 * reactivity;
+
+            ctx.beginPath();
+            ctx.moveTo(
+                Math.cos(angle) * maxDim * 0.1,
+                Math.sin(angle) * maxDim * 0.1
+            );
+            ctx.lineTo(
+                Math.cos(angle) * maxDim * 1.3 * breathe,
+                Math.sin(angle) * maxDim * 1.3 * breathe
+            );
+
+            if (i % 2 === 0) {
+                ctx.setLineDash([8, 12]);
+            } else {
+                ctx.setLineDash([]);
+            }
+            ctx.strokeStyle = `hsla(${lineHue}, ${config.saturation * 0.4}%, 55%, ${baseAlpha * 0.7})`;
+            ctx.lineWidth = 0.5 + energy * reactivity * 1.5;
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // --- NEAR LAYER (1.2x): Small floating polygon outlines ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 1.2);
+
+        const floatCount = 18;
+        for (let i = 0; i < floatCount; i++) {
+            const seed = i * 7 + 42;
+            const dist = maxDim * (0.25 + this.seededRandom(seed) * 0.85);
+            const baseAngle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const sides = 3 + Math.floor(this.seededRandom(seed + 2) * 4);
+            const size = maxDim * (0.02 + this.seededRandom(seed + 3) * 0.035);
+            const selfRot = rot * (1.5 + this.seededRandom(seed + 4)) * (this.seededRandom(seed + 5) > 0.5 ? 1 : -1);
+            const floatHue = (bgHue + this.seededRandom(seed + 6) * 60) % 360;
+
+            const fx = Math.cos(baseAngle) * dist;
+            const fy = Math.sin(baseAngle) * dist;
+
+            ctx.save();
+            ctx.translate(fx, fy);
+            ctx.rotate(selfRot);
+
+            ctx.beginPath();
+            for (let s = 0; s <= sides; s++) {
+                const a = (Math.PI * 2 * s) / sides;
+                const px = Math.cos(a) * size;
+                const py = Math.sin(a) * size;
+                s === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = `hsla(${floatHue}, ${config.saturation * 0.45}%, 55%, ${baseAlpha * 0.8})`;
+            ctx.lineWidth = 0.6 + energy * reactivity;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Glass background — "Prismatic Refraction Field"
+     * 3 parallax layers: prismatic wedges (far), triangular facets (mid), diamond sparkles (near)
+     */
+    renderGlassBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+
+        // --- FAR LAYER (0.25x): Prismatic light-cone wedges ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.25);
+
+        const wedgeCount = 12;
+        for (let i = 0; i < wedgeCount; i++) {
+            const angle = (Math.PI * 2 * i) / wedgeCount;
+            const wedgeWidth = Math.PI / wedgeCount * 0.6;
+            const wedgeHue = (bgHue + i * 30 + harmonic * 20) % 360;
+            const reach = maxDim * 1.3;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(
+                Math.cos(angle - wedgeWidth / 2) * reach,
+                Math.sin(angle - wedgeWidth / 2) * reach
+            );
+            ctx.lineTo(
+                Math.cos(angle + wedgeWidth / 2) * reach,
+                Math.sin(angle + wedgeWidth / 2) * reach
+            );
+            ctx.closePath();
+
+            const grad = ctx.createLinearGradient(0, 0,
+                Math.cos(angle) * reach * 0.7,
+                Math.sin(angle) * reach * 0.7
+            );
+            grad.addColorStop(0, `hsla(${wedgeHue}, ${config.saturation * 0.6}%, 60%, 0)`);
+            grad.addColorStop(0.3, `hsla(${wedgeHue}, ${config.saturation * 0.6}%, 60%, ${baseAlpha * 0.5})`);
+            grad.addColorStop(0.7, `hsla(${(wedgeHue + 40) % 360}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * 0.4})`);
+            grad.addColorStop(1, `hsla(${(wedgeHue + 80) % 360}, ${config.saturation * 0.4}%, 50%, 0)`);
+
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (0.6x, counter-rotate): Scattered triangular facets ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.6);
+
+        const facetCount = 20;
+        for (let i = 0; i < facetCount; i++) {
+            const seed = i * 11 + 137;
+            const dist = maxDim * (0.2 + this.seededRandom(seed) * 0.9);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const size = maxDim * (0.03 + this.seededRandom(seed + 2) * 0.05);
+            const facetRot = this.seededRandom(seed + 3) * Math.PI + rot * 0.3;
+            const facetHue = (bgHue + this.seededRandom(seed + 4) * 80 - 20) % 360;
+
+            const fx = Math.cos(angle) * dist;
+            const fy = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(fx, fy);
+            ctx.rotate(facetRot);
+
+            // Triangular facet outline
+            ctx.beginPath();
+            ctx.moveTo(0, -size);
+            ctx.lineTo(size * 0.866, size * 0.5);
+            ctx.lineTo(-size * 0.866, size * 0.5);
+            ctx.closePath();
+            ctx.strokeStyle = `hsla(${facetHue}, ${config.saturation * 0.5}%, 60%, ${baseAlpha * 0.8})`;
+            ctx.lineWidth = 0.6 + energy * reactivity;
+            ctx.stroke();
+
+            // Internal lines from center to vertices
+            ctx.beginPath();
+            ctx.moveTo(0, 0); ctx.lineTo(0, -size);
+            ctx.moveTo(0, 0); ctx.lineTo(size * 0.866, size * 0.5);
+            ctx.moveTo(0, 0); ctx.lineTo(-size * 0.866, size * 0.5);
+            ctx.strokeStyle = `hsla(${facetHue}, ${config.saturation * 0.4}%, 55%, ${baseAlpha * 0.5})`;
+            ctx.lineWidth = 0.4;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (1.1x): Twinkling diamond sparkle points (4-pointed stars) ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 1.1);
+
+        const sparkleCount = 30;
+        for (let i = 0; i < sparkleCount; i++) {
+            const seed = i * 13 + 257;
+            const dist = maxDim * (0.15 + this.seededRandom(seed) * 1.0);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const phase = this.seededRandom(seed + 2) * Math.PI * 2;
+            const baseSize = maxDim * (0.008 + this.seededRandom(seed + 3) * 0.015);
+            const size = baseSize * (0.5 + Math.sin(rot * 4 + phase) * 0.5);
+            const sparkleHue = (bgHue + this.seededRandom(seed + 4) * 90) % 360;
+
+            const sx = Math.cos(angle) * dist;
+            const sy = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+
+            // 4-pointed star
+            ctx.beginPath();
+            ctx.moveTo(0, -size * 2);
+            ctx.lineTo(size * 0.3, -size * 0.3);
+            ctx.lineTo(size * 2, 0);
+            ctx.lineTo(size * 0.3, size * 0.3);
+            ctx.lineTo(0, size * 2);
+            ctx.lineTo(-size * 0.3, size * 0.3);
+            ctx.lineTo(-size * 2, 0);
+            ctx.lineTo(-size * 0.3, -size * 0.3);
+            ctx.closePath();
+
+            ctx.fillStyle = `hsla(${sparkleHue}, ${config.saturation * 0.6}%, 70%, ${baseAlpha * (0.6 + Math.sin(rot * 4 + phase) * 0.4)})`;
+            ctx.fill();
+
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Flower background — "Drifting Pollen Field"
+     * 3 parallax layers: sweeping petal curves (far), floating petals (mid), pollen dots with tendrils (near)
+     */
+    renderFlowerBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+
+        // --- FAR LAYER (0.2x): Large sweeping bezier curves — enormous petal silhouettes ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.2);
+
+        const petalSweeps = 8;
+        for (let i = 0; i < petalSweeps; i++) {
+            const angle = (Math.PI * 2 * i) / petalSweeps;
+            const petalHue = (bgHue + i * 20 + harmonic * 15) % 360;
+            const reach = maxDim * (1.0 + energy * reactivity * 0.2);
+            const spread = maxDim * 0.4;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(
+                Math.cos(angle - 0.3) * spread, Math.sin(angle - 0.3) * spread,
+                Math.cos(angle + 0.15) * reach * 0.8, Math.sin(angle + 0.15) * reach * 0.8,
+                Math.cos(angle) * reach, Math.sin(angle) * reach
+            );
+            ctx.bezierCurveTo(
+                Math.cos(angle - 0.15) * reach * 0.8, Math.sin(angle - 0.15) * reach * 0.8,
+                Math.cos(angle + 0.3) * spread, Math.sin(angle + 0.3) * spread,
+                0, 0
+            );
+
+            ctx.strokeStyle = `hsla(${petalHue}, ${config.saturation * 0.45}%, 55%, ${baseAlpha * 0.7})`;
+            ctx.lineWidth = 1.0 + energy * reactivity * 1.5;
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (0.5x): Floating small petal outlines with center veins ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.5);
+
+        const floatPetals = 16;
+        for (let i = 0; i < floatPetals; i++) {
+            const seed = i * 9 + 83;
+            const dist = maxDim * (0.25 + this.seededRandom(seed) * 0.75);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const petalSize = maxDim * (0.03 + this.seededRandom(seed + 2) * 0.04);
+            const petalAngle = this.seededRandom(seed + 3) * Math.PI * 2 + rot * 0.4;
+            const petalHue = (bgHue + this.seededRandom(seed + 4) * 50 - 10) % 360;
+
+            const px = Math.cos(angle) * dist;
+            const py = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(petalAngle);
+
+            // Petal shape via bezier
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(
+                petalSize * 0.5, -petalSize * 0.3,
+                petalSize * 0.8, -petalSize * 0.15,
+                petalSize, 0
+            );
+            ctx.bezierCurveTo(
+                petalSize * 0.8, petalSize * 0.15,
+                petalSize * 0.5, petalSize * 0.3,
+                0, 0
+            );
+            ctx.strokeStyle = `hsla(${petalHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * 0.8})`;
+            ctx.lineWidth = 0.6 + energy * reactivity;
+            ctx.stroke();
+
+            // Center vein
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(petalSize * 0.9, 0);
+            ctx.strokeStyle = `hsla(${petalHue}, ${config.saturation * 0.4}%, 50%, ${baseAlpha * 0.5})`;
+            ctx.lineWidth = 0.4;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (0.9x, counter-rotate): Pollen dots with vine tendrils ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.9);
+
+        const pollenCount = 25;
+        for (let i = 0; i < pollenCount; i++) {
+            const seed = i * 17 + 191;
+            const dist = maxDim * (0.15 + this.seededRandom(seed) * 0.95);
+            const baseAngle = this.seededRandom(seed + 1) * Math.PI * 2;
+            // Drift along curved path
+            const drift = Math.sin(rot * 2 + this.seededRandom(seed + 2) * Math.PI * 2) * maxDim * 0.03;
+            const px = Math.cos(baseAngle) * (dist + drift);
+            const py = Math.sin(baseAngle) * (dist + drift);
+            const dotSize = maxDim * (0.004 + this.seededRandom(seed + 3) * 0.006);
+            const pollenHue = (bgHue + 30 + this.seededRandom(seed + 4) * 40) % 360;
+
+            // Pollen dot
+            ctx.beginPath();
+            ctx.arc(px, py, dotSize * (0.8 + energy * reactivity * 0.4), 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${pollenHue}, ${config.saturation * 0.5}%, 60%, ${baseAlpha})`;
+            ctx.fill();
+
+            // Vine tendril to next pollen (connect some pairs)
+            if (i < pollenCount - 1 && this.seededRandom(seed + 5) > 0.5) {
+                const nextSeed = (i + 1) * 17 + 191;
+                const nextDist = maxDim * (0.15 + this.seededRandom(nextSeed) * 0.95);
+                const nextAngle = this.seededRandom(nextSeed + 1) * Math.PI * 2;
+                const nextDrift = Math.sin(rot * 2 + this.seededRandom(nextSeed + 2) * Math.PI * 2) * maxDim * 0.03;
+                const nx = Math.cos(nextAngle) * (nextDist + nextDrift);
+                const ny = Math.sin(nextAngle) * (nextDist + nextDrift);
+
+                const cpx = (px + nx) / 2 + (py - ny) * 0.3;
+                const cpy = (py + ny) / 2 + (nx - px) * 0.3;
+
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.quadraticCurveTo(cpx, cpy, nx, ny);
+                ctx.strokeStyle = `hsla(${(pollenHue + 20) % 360}, ${config.saturation * 0.35}%, 45%, ${baseAlpha * 0.5})`;
+                ctx.lineWidth = 0.4 + energy * reactivity * 0.3;
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Spiral background — "Vortex Current"
+     * 3 parallax layers: logarithmic spiral arms (far), wobbling rings (mid), mini comet spirals (near)
+     */
+    renderSpiralBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+
+        // --- FAR LAYER (0.35x): Large logarithmic spiral arms ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.35);
+
+        const armCount = 4;
+        const spiralTurns = 2.5;
+        const stepsPerArm = 80;
+        for (let arm = 0; arm < armCount; arm++) {
+            const armOffset = (Math.PI * 2 * arm) / armCount;
+            const armHue = (bgHue + arm * 40 + harmonic * 15) % 360;
+
+            ctx.beginPath();
+            for (let s = 0; s <= stepsPerArm; s++) {
+                const t = s / stepsPerArm;
+                const theta = t * spiralTurns * Math.PI * 2 + armOffset;
+                const r = maxDim * 0.05 * Math.pow(1.15, s * 0.15) * (0.9 + energy * reactivity * 0.15);
+                const x = Math.cos(theta) * r;
+                const y = Math.sin(theta) * r;
+                s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `hsla(${armHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * 0.8})`;
+            ctx.lineWidth = 1.0 + energy * reactivity * 1.5;
+            ctx.stroke();
+
+            // Traveling pulse along arm
+            const pulsePos = ((rot * 8) % 1.0);
+            const pulseStep = Math.floor(pulsePos * stepsPerArm);
+            const pulseTheta = (pulseStep / stepsPerArm) * spiralTurns * Math.PI * 2 + armOffset;
+            const pulseR = maxDim * 0.05 * Math.pow(1.15, pulseStep * 0.15);
+            const pulseX = Math.cos(pulseTheta) * pulseR;
+            const pulseY = Math.sin(pulseTheta) * pulseR;
+
+            ctx.beginPath();
+            ctx.arc(pulseX, pulseY, 2 + energy * 3, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${armHue}, ${config.saturation * 0.6}%, 65%, ${baseAlpha * 1.5})`;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (0.8x, counter-rotate): Concentric wobbling vortex rings ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.8);
+
+        const vortexRings = 6;
+        const ringSteps = 60;
+        for (let r = 0; r < vortexRings; r++) {
+            const ringRadius = maxDim * (0.15 + r * 0.18);
+            const ringHue = (bgHue + r * 30 + brightness * 10) % 360;
+            const wobbleAmp = maxDim * 0.015 * (1 + energy * reactivity * 0.5);
+
+            ctx.beginPath();
+            for (let s = 0; s <= ringSteps; s++) {
+                const angle = (Math.PI * 2 * s) / ringSteps;
+                const wobble = Math.sin(angle * (3 + r) + rot * 6) * wobbleAmp;
+                const x = Math.cos(angle) * (ringRadius + wobble);
+                const y = Math.sin(angle) * (ringRadius + wobble);
+                s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `hsla(${ringHue}, ${config.saturation * 0.45}%, 55%, ${baseAlpha * (0.9 - r * 0.08)})`;
+            ctx.lineWidth = 0.6 + energy * reactivity;
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (1.4x): Mini trailing comet spirals ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 1.4);
+
+        const cometCount = 12;
+        for (let i = 0; i < cometCount; i++) {
+            const seed = i * 19 + 53;
+            const dist = maxDim * (0.2 + this.seededRandom(seed) * 0.8);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const cometSize = maxDim * (0.02 + this.seededRandom(seed + 2) * 0.03);
+            const selfRot = rot * (3 + this.seededRandom(seed + 3) * 2) * (this.seededRandom(seed + 4) > 0.5 ? 1 : -1);
+            const cometHue = (bgHue + this.seededRandom(seed + 5) * 60) % 360;
+
+            const cx = Math.cos(angle) * dist;
+            const cy = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            // Mini spiral trail
+            const tailSteps = 20;
+            ctx.beginPath();
+            for (let s = 0; s <= tailSteps; s++) {
+                const t = s / tailSteps;
+                const theta = t * Math.PI * 3 + selfRot;
+                const r = cometSize * t;
+                const x = Math.cos(theta) * r;
+                const y = Math.sin(theta) * r;
+                s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `hsla(${cometHue}, ${config.saturation * 0.5}%, 60%, ${baseAlpha * 0.8})`;
+            ctx.lineWidth = 0.5 + energy * reactivity * 0.8;
+            ctx.stroke();
+
+            // Comet head
+            ctx.beginPath();
+            const headTheta = Math.PI * 3 + selfRot;
+            ctx.arc(Math.cos(headTheta) * cometSize, Math.sin(headTheta) * cometSize,
+                1.5 + energy * 2, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${cometHue}, ${config.saturation * 0.6}%, 65%, ${baseAlpha * 1.2})`;
+            ctx.fill();
+
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Circuit background — "Grid Matrix"
+     * 3 parallax layers: hexagonal grid (far), energy pulses (mid), data nodes (near)
+     */
+    renderCircuitBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+
+        // --- FAR LAYER (0.15x): Hexagonal grid outlines ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.15);
+
+        const hexSize = maxDim * 0.08;
+        const hexH = hexSize * Math.sqrt(3);
+        const cols = Math.ceil(maxDim * 1.5 / (hexSize * 1.5));
+        const rows = Math.ceil(maxDim * 1.5 / hexH);
+        let hexCount = 0;
+        const maxHexes = 90;
+
+        for (let row = -rows; row <= rows && hexCount < maxHexes; row++) {
+            for (let col = -cols; col <= cols && hexCount < maxHexes; col++) {
+                const cx = col * hexSize * 1.5;
+                const cy = row * hexH + (col % 2 === 0 ? 0 : hexH * 0.5);
+
+                // Skip hexes outside viewport with margin
+                if (Math.abs(cx) > maxDim * 1.2 || Math.abs(cy) > maxDim * 1.2) continue;
+
+                const distFromCenter = Math.sqrt(cx * cx + cy * cy);
+                const hexHue = (bgHue + distFromCenter * 0.05 + brightness * 10) % 360;
+
+                ctx.beginPath();
+                for (let s = 0; s < 6; s++) {
+                    const a = (Math.PI / 3) * s;
+                    const hx = cx + Math.cos(a) * hexSize * 0.45;
+                    const hy = cy + Math.sin(a) * hexSize * 0.45;
+                    s === 0 ? ctx.moveTo(hx, hy) : ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = `hsla(${hexHue}, ${config.saturation * 0.4}%, 50%, ${baseAlpha * 0.6})`;
+                ctx.lineWidth = 0.5 + energy * reactivity * 0.5;
+                ctx.stroke();
+
+                hexCount++;
+            }
+        }
+        ctx.restore();
+
+        // --- MID LAYER (0.4x): Traveling energy pulse dots along trace paths ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.4);
+
+        const traceCount = 15;
+        for (let i = 0; i < traceCount; i++) {
+            const seed = i * 23 + 97;
+            const startAngle = this.seededRandom(seed) * Math.PI * 2;
+            const startDist = maxDim * (0.1 + this.seededRandom(seed + 1) * 0.3);
+            const endAngle = startAngle + (this.seededRandom(seed + 2) - 0.5) * Math.PI;
+            const endDist = maxDim * (0.4 + this.seededRandom(seed + 3) * 0.6);
+            const traceHue = (bgHue + this.seededRandom(seed + 4) * 40) % 360;
+
+            const sx = Math.cos(startAngle) * startDist;
+            const sy = Math.sin(startAngle) * startDist;
+            const ex = Math.cos(endAngle) * endDist;
+            const ey = Math.sin(endAngle) * endDist;
+
+            // Trace path (orthogonal segments like circuit traces)
+            const mx = ex;
+            const my = sy;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(mx, my);
+            ctx.lineTo(ex, ey);
+            ctx.strokeStyle = `hsla(${traceHue}, ${config.saturation * 0.4}%, 50%, ${baseAlpha * 0.5})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+
+            // Traveling pulse dot
+            const phase = this.seededRandom(seed + 5);
+            const t = ((rot * 3 + phase) % 1.0);
+            let px, py;
+            if (t < 0.5) {
+                const lt = t * 2;
+                px = sx + (mx - sx) * lt;
+                py = sy + (my - sy) * lt;
+            } else {
+                const lt = (t - 0.5) * 2;
+                px = mx + (ex - mx) * lt;
+                py = my + (ey - my) * lt;
+            }
+
+            ctx.beginPath();
+            ctx.arc(px, py, 1.5 + energy * 2, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${traceHue}, ${config.saturation * 0.6}%, 65%, ${baseAlpha * 1.5})`;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (0.8x, counter-rotate): Glowing data nodes ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.8);
+
+        const nodeCount = 20;
+        for (let i = 0; i < nodeCount; i++) {
+            const seed = i * 31 + 211;
+            const dist = maxDim * (0.15 + this.seededRandom(seed) * 0.9);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const phase = this.seededRandom(seed + 2) * Math.PI * 2;
+            const nodeHue = (bgHue + this.seededRandom(seed + 3) * 50) % 360;
+            const pulseSize = maxDim * 0.008 * (0.6 + Math.sin(rot * 5 + phase) * 0.4);
+
+            const nx = Math.cos(angle) * dist;
+            const ny = Math.sin(angle) * dist;
+
+            // Outer glow
+            ctx.beginPath();
+            ctx.arc(nx, ny, pulseSize * 3, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${nodeHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * 0.3})`;
+            ctx.fill();
+
+            // Inner node
+            ctx.beginPath();
+            ctx.arc(nx, ny, pulseSize, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${nodeHue}, ${config.saturation * 0.6}%, 65%, ${baseAlpha * 1.2})`;
+            ctx.fill();
+
+            // Small cross-hair
+            const chSize = pulseSize * 2.5;
+            ctx.beginPath();
+            ctx.moveTo(nx - chSize, ny);
+            ctx.lineTo(nx + chSize, ny);
+            ctx.moveTo(nx, ny - chSize);
+            ctx.lineTo(nx, ny + chSize);
+            ctx.strokeStyle = `hsla(${nodeHue}, ${config.saturation * 0.5}%, 60%, ${baseAlpha * 0.6})`;
+            ctx.lineWidth = 0.4;
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Fibonacci background — "Sacred Geometry Web"
+     * 3 parallax layers: golden spirals (far), golden rectangles (mid), phyllotaxis dots (near)
+     */
+    renderFibonacciBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+        const PHI = (1 + Math.sqrt(5)) / 2;
+        const GOLDEN_ANGLE = Math.PI * 2 * (1 - 1 / PHI); // ~137.5 degrees
+
+        // --- FAR LAYER (0.2x): Two large golden spirals (CW + CCW) ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.2);
+
+        for (let dir = 0; dir < 2; dir++) {
+            const sign = dir === 0 ? 1 : -1;
+            const spiralHue = (bgHue + dir * 30 + harmonic * 15) % 360;
+            const steps = 100;
+
+            ctx.beginPath();
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                const theta = t * Math.PI * 6 * sign;
+                const r = maxDim * 0.02 * Math.pow(PHI, t * 4) * (0.9 + energy * reactivity * 0.15);
+                const x = Math.cos(theta) * r;
+                const y = Math.sin(theta) * r;
+                s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `hsla(${spiralHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * 0.8})`;
+            ctx.lineWidth = 0.8 + energy * reactivity * 1.5;
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (0.5x, counter-rotate): Nested golden rectangles with quarter-arc spirals ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.5);
+
+        const rectLevels = 8;
+        let rw = maxDim * 0.9;
+        let rh = rw / PHI;
+        let rx = -rw / 2;
+        let ry = -rh / 2;
+
+        for (let i = 0; i < rectLevels; i++) {
+            const rectHue = (bgHue + i * 20 + brightness * 10) % 360;
+
+            // Rectangle outline
+            ctx.beginPath();
+            ctx.rect(rx, ry, rw, rh);
+            ctx.strokeStyle = `hsla(${rectHue}, ${config.saturation * 0.4}%, 55%, ${baseAlpha * (0.8 - i * 0.06)})`;
+            ctx.lineWidth = 0.6 + energy * reactivity * 0.8;
+            ctx.stroke();
+
+            // Quarter-circle arc in the square portion
+            const squareSize = Math.min(rw, rh);
+            let arcCX, arcCY, arcStart;
+
+            switch (i % 4) {
+                case 0: // top-left square, arc from bottom-right corner
+                    arcCX = rx + squareSize;
+                    arcCY = ry + squareSize;
+                    arcStart = Math.PI;
+                    break;
+                case 1: // top-right, arc from bottom-left
+                    arcCX = rx + rw - squareSize;
+                    arcCY = ry + rh;
+                    arcStart = -Math.PI / 2;
+                    break;
+                case 2: // bottom-right, arc from top-left
+                    arcCX = rx + rw - squareSize;
+                    arcCY = ry + rh - squareSize;
+                    arcStart = 0;
+                    break;
+                case 3: // bottom-left, arc from top-right
+                    arcCX = rx + squareSize;
+                    arcCY = ry;
+                    arcStart = Math.PI / 2;
+                    break;
+            }
+
+            ctx.beginPath();
+            ctx.arc(arcCX, arcCY, squareSize, arcStart, arcStart + Math.PI / 2);
+            ctx.strokeStyle = `hsla(${(rectHue + 40) % 360}, ${config.saturation * 0.5}%, 60%, ${baseAlpha * (0.9 - i * 0.07)})`;
+            ctx.lineWidth = 0.5 + energy * reactivity * 0.6;
+            ctx.stroke();
+
+            // Subdivide: remove the square and continue with remainder
+            const newW = rw - squareSize;
+            const newH = rh;
+            switch (i % 4) {
+                case 0:
+                    rx = rx + squareSize;
+                    rw = newW > 0 ? newW : rh;
+                    rh = newW > 0 ? rh : rw;
+                    break;
+                case 1:
+                    ry = ry + (rh - rw);
+                    rh = rw;
+                    rw = newH;
+                    break;
+                case 2:
+                    rw = rw - squareSize;
+                    if (rw <= 0) { rw = rh; }
+                    break;
+                case 3:
+                    rh = squareSize;
+                    rw = newH;
+                    break;
+            }
+            // Prevent degenerate rectangles
+            if (rw < 2 || rh < 2) break;
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (1.0x): Phyllotaxis dot field ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 1.0);
+
+        const dotCount = 180;
+        const maxPhylloRadius = maxDim * 0.85;
+        const pulseWave = rot * 4; // outward pulse
+
+        for (let i = 1; i <= dotCount; i++) {
+            const angle = i * GOLDEN_ANGLE;
+            const r = maxPhylloRadius * Math.sqrt(i / dotCount) * (0.95 + energy * reactivity * 0.1);
+            const x = Math.cos(angle) * r;
+            const y = Math.sin(angle) * r;
+
+            const normalizedR = r / maxPhylloRadius;
+            const pulse = Math.sin(pulseWave - normalizedR * 8) * 0.5 + 0.5;
+            const dotSize = (1 + pulse * 2) * (0.8 + energy * reactivity * 0.4);
+            const dotHue = (bgHue + i * 0.5 + harmonic * 20) % 360;
+
+            ctx.beginPath();
+            ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${dotHue}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * (0.5 + pulse * 0.5)})`;
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * DMT background — "Hyperspace Warp Field"
+     * 3 parallax layers: non-euclidean grid warp (far), pulsing cycloid rings (mid), neon kite shards (near)
+     */
+    renderDMTBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+
+        // --- FAR LAYER (0.2x): Non-euclidean curved grid radiating from center ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.2);
+
+        // Radial lines that curve with bass
+        const gridRadials = 16;
+        for (let i = 0; i < gridRadials; i++) {
+            const angle = (Math.PI * 2 * i) / gridRadials;
+            const lineHue = (bgHue + i * (360 / gridRadials) + harmonic * 30) % 360;
+            const curveAmt = maxDim * 0.15 * energy * reactivity;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            const midR = maxDim * 0.6;
+            const endR = maxDim * 1.3;
+            const cpx = Math.cos(angle + 0.2 * Math.sin(rot * 2)) * midR;
+            const cpy = Math.sin(angle + 0.2 * Math.sin(rot * 2)) * midR;
+            ctx.quadraticCurveTo(cpx, cpy,
+                Math.cos(angle) * endR, Math.sin(angle) * endR);
+
+            ctx.strokeStyle = `hsla(${lineHue}, ${Math.min(100, config.saturation * 0.7)}%, 55%, ${baseAlpha * 0.7})`;
+            ctx.lineWidth = 0.5 + energy * reactivity;
+            ctx.stroke();
+        }
+
+        // Concentric warped rings
+        const warpRings = 5;
+        for (let r = 0; r < warpRings; r++) {
+            const ringR = maxDim * (0.2 + r * 0.22);
+            const ringHue = (bgHue + r * 40 + brightness * 20) % 360;
+            const steps = 40;
+
+            ctx.beginPath();
+            for (let s = 0; s <= steps; s++) {
+                const angle = (Math.PI * 2 * s) / steps;
+                const warp = Math.sin(angle * 5 + rot * 3) * maxDim * 0.02 * (1 + energy * reactivity);
+                const x = Math.cos(angle) * (ringR + warp);
+                const y = Math.sin(angle) * (ringR + warp);
+                s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `hsla(${ringHue}, ${Math.min(100, config.saturation * 0.6)}%, 55%, ${baseAlpha * (0.6 - r * 0.07)})`;
+            ctx.lineWidth = 0.6 + energy * reactivity * 0.8;
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (0.6x, counter-rotate): Cycloid petal rings ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.6);
+
+        const petalRings = 3;
+        for (let ring = 0; ring < petalRings; ring++) {
+            const ringDist = maxDim * (0.3 + ring * 0.25);
+            const petals = 8 + ring * 4;
+            const petalSize = maxDim * (0.06 - ring * 0.01);
+            const ringHue = (bgHue + ring * 50 + harmonic * 25) % 360;
+
+            for (let p = 0; p < petals; p++) {
+                const pAngle = (Math.PI * 2 * p) / petals;
+                const px = Math.cos(pAngle) * ringDist;
+                const py = Math.sin(pAngle) * ringDist;
+
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                const cpDist = petalSize * (0.8 + energy * reactivity * 0.5);
+                ctx.bezierCurveTo(
+                    px + Math.cos(pAngle - 0.5) * cpDist, py + Math.sin(pAngle - 0.5) * cpDist,
+                    px + Math.cos(pAngle + 0.3) * cpDist * 1.5, py + Math.sin(pAngle + 0.3) * cpDist * 1.5,
+                    px + Math.cos(pAngle) * petalSize * 2, py + Math.sin(pAngle) * petalSize * 2
+                );
+
+                ctx.strokeStyle = `hsla(${(ringHue + p * 15) % 360}, ${Math.min(100, config.saturation * 0.6)}%, 60%, ${baseAlpha * 0.7})`;
+                ctx.lineWidth = 0.5 + energy * reactivity * 0.6;
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (1.3x): Floating neon kite/dart shards ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 1.3);
+
+        const shardCount = 20;
+        for (let i = 0; i < shardCount; i++) {
+            const seed = i * 23 + 333;
+            const dist = maxDim * (0.2 + this.seededRandom(seed) * 0.9);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const size = maxDim * (0.015 + this.seededRandom(seed + 2) * 0.025);
+            const selfRot = rot * (2 + this.seededRandom(seed + 3) * 2) * (this.seededRandom(seed + 4) > 0.5 ? 1 : -1);
+            const shardHue = (bgHue + this.seededRandom(seed + 5) * 120) % 360;
+
+            const sx = Math.cos(angle) * dist;
+            const sy = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(selfRot);
+
+            // Kite shape
+            ctx.beginPath();
+            ctx.moveTo(0, -size * 1.618);
+            ctx.lineTo(size * 0.5, 0);
+            ctx.lineTo(0, size * 0.4);
+            ctx.lineTo(-size * 0.5, 0);
+            ctx.closePath();
+
+            ctx.strokeStyle = `hsla(${shardHue}, ${Math.min(100, config.saturation * 0.7)}%, 60%, ${baseAlpha * 0.9})`;
+            ctx.lineWidth = 0.5 + energy * reactivity * 0.5;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Sacred background — "Cloud Chamber Vapor"
+     * 3 parallax layers: radial decay tracks (far), concentric detector rings (mid), Compton scatter bursts (near)
+     */
+    renderSacredBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+        const amberHue = 35;
+        const crimsonHue = 350;
+
+        // --- FAR LAYER (0.15x): Scattered large faint sigils ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.15);
+
+        for (let i = 0; i < 14; i++) {
+            const seed = i * 31 + 53;
+            const dist = maxDim * (0.2 + this.seededRandom(seed) * 0.85);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const symType = Math.floor(this.seededRandom(seed + 2) * 16);
+            const size = maxDim * (0.04 + this.seededRandom(seed + 3) * 0.04);
+            const symRot = this.seededRandom(seed + 4) * Math.PI * 2 + rot * 0.2;
+            const symHue = (amberHue + this.seededRandom(seed + 5) * 40 - 20) % 360;
+            const sx = Math.cos(angle) * dist;
+            const sy = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(symRot);
+            ctx.strokeStyle = `hsla(${symHue}, ${config.saturation * 0.4}%, 50%, ${baseAlpha * 0.6})`;
+            ctx.lineWidth = 0.6 + energy * reactivity * 0.3;
+            ctx.lineCap = 'round';
+            this._drawOccultSymbol(ctx, symType, size);
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (-0.5x, counter-rotate): Dense medium symbols ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.5);
+
+        for (let i = 0; i < 20; i++) {
+            const seed = i * 19 + 137;
+            const dist = maxDim * (0.1 + this.seededRandom(seed) * 0.95);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const symType = Math.floor(this.seededRandom(seed + 2) * 16);
+            const size = maxDim * (0.015 + this.seededRandom(seed + 3) * 0.025);
+            const symRot = this.seededRandom(seed + 4) * Math.PI * 2 + rot * 0.4;
+            const symHue = (crimsonHue + this.seededRandom(seed + 5) * 50 - 25) % 360;
+            const sx = Math.cos(angle) * dist;
+            const sy = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(symRot);
+            ctx.strokeStyle = `hsla(${symHue}, ${config.saturation * 0.5}%, 45%, ${baseAlpha * 0.5})`;
+            ctx.lineWidth = 0.5 + harmonic * 0.4;
+            ctx.lineCap = 'round';
+            this._drawOccultSymbol(ctx, symType, size);
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (0.9x): Small bright glyphs ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.9);
+
+        for (let i = 0; i < 18; i++) {
+            const seed = i * 23 + 211;
+            const dist = maxDim * (0.08 + this.seededRandom(seed) * 1.0);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const symType = Math.floor(this.seededRandom(seed + 2) * 16);
+            const size = maxDim * (0.008 + this.seededRandom(seed + 3) * 0.014);
+            const phase = this.seededRandom(seed + 4) * Math.PI * 2;
+            const pulse = 0.6 + Math.sin(rot * 3 + phase) * 0.4;
+            const symHue = (bgHue + this.seededRandom(seed + 5) * 60) % 360;
+            const sx = Math.cos(angle) * dist;
+            const sy = Math.sin(angle) * dist;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(rot * 0.6 + phase);
+            ctx.strokeStyle = `hsla(${symHue}, ${config.saturation * 0.5}%, 60%, ${baseAlpha * 0.8 * pulse})`;
+            ctx.lineWidth = 0.4 + brightness * 0.4;
+            ctx.lineCap = 'round';
+            this._drawOccultSymbol(ctx, symType, size);
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Mycelial background — "Mushroom Forest Floor"
+     * 3 parallax layers: ghostly mushroom silhouettes (far), drifting spore haze (mid), glowing fairy-ring fungi (near)
+     */
+    renderMycelialBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+        const cyanHue = 180;
+        const amethystHue = 275;
+
+        // --- FAR LAYER (0.15x): Ghostly mushroom silhouettes ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.15);
+
+        for (let i = 0; i < 10; i++) {
+            const seed = i * 37 + 47;
+            const dist = maxDim * (0.25 + this.seededRandom(seed) * 0.7);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const mushHue = (amethystHue + this.seededRandom(seed + 2) * 40 - 20) % 360;
+            const capW = maxDim * (0.03 + this.seededRandom(seed + 3) * 0.04);
+            const capH = capW * (0.4 + this.seededRandom(seed + 4) * 0.2);
+            const stipeH = capW * (0.8 + this.seededRandom(seed + 5) * 0.6);
+            const mx = Math.cos(angle) * dist;
+            const my = Math.sin(angle) * dist;
+            const alpha = baseAlpha * (0.4 + this.seededRandom(seed + 6) * 0.3);
+
+            ctx.save();
+            ctx.translate(mx, my);
+
+            // Stipe (stem)
+            ctx.beginPath();
+            ctx.moveTo(-capW * 0.08, 0);
+            ctx.quadraticCurveTo(-capW * 0.12, stipeH * 0.5, -capW * 0.06, stipeH);
+            ctx.lineTo(capW * 0.06, stipeH);
+            ctx.quadraticCurveTo(capW * 0.12, stipeH * 0.5, capW * 0.08, 0);
+            ctx.fillStyle = `hsla(${mushHue}, ${config.saturation * 0.25}%, 40%, ${alpha})`;
+            ctx.fill();
+
+            // Cap (dome)
+            ctx.beginPath();
+            ctx.ellipse(0, 0, capW, capH, 0, Math.PI, 0);
+            ctx.fillStyle = `hsla(${mushHue}, ${config.saturation * 0.35}%, 35%, ${alpha * 1.2})`;
+            ctx.fill();
+
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (-0.5x, counter-rotate): Drifting spore haze ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.5);
+
+        for (let i = 0; i < 30; i++) {
+            const seed = i * 13 + 113;
+            const dist = maxDim * (0.05 + this.seededRandom(seed) * 1.0);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const drift = Math.sin(rot * 1.2 + this.seededRandom(seed + 2) * Math.PI * 2) * maxDim * 0.03;
+            const sporeSize = maxDim * (0.002 + this.seededRandom(seed + 3) * 0.005);
+            const sporeHue = (amethystHue + this.seededRandom(seed + 4) * 60 - 30) % 360;
+            const phase = this.seededRandom(seed + 5) * Math.PI * 2;
+            const pulse = 0.5 + Math.sin(rot * 2 + phase) * 0.5;
+
+            const sx = Math.cos(angle) * (dist + drift);
+            const sy = Math.sin(angle) * (dist + drift);
+
+            // Tiny drifting spore with subtle glow
+            const spGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sporeSize * 3);
+            spGrad.addColorStop(0, `hsla(${sporeHue}, ${config.saturation * 0.5}%, 65%, ${baseAlpha * 0.5 * pulse})`);
+            spGrad.addColorStop(1, `hsla(${sporeHue}, ${config.saturation * 0.3}%, 50%, 0)`);
+            ctx.beginPath();
+            ctx.arc(sx, sy, sporeSize * 3, 0, Math.PI * 2);
+            ctx.fillStyle = spGrad;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (0.9x): Fairy-ring mushroom clusters with glow ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.9);
+
+        for (let i = 0; i < 8; i++) {
+            const seed = i * 29 + 227;
+            const ringDist = maxDim * (0.2 + this.seededRandom(seed) * 0.7);
+            const ringAngle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const phase = this.seededRandom(seed + 2) * Math.PI * 2;
+            const pulse = 0.5 + Math.sin(rot * 3 + phase) * 0.5;
+            const clusterHue = (cyanHue + this.seededRandom(seed + 3) * 50) % 360;
+            const rx = Math.cos(ringAngle) * ringDist;
+            const ry = Math.sin(ringAngle) * ringDist;
+
+            // Bioluminescent ground glow
+            const glowR = maxDim * 0.04 * (0.7 + pulse * 0.5 + energy * reactivity * 0.3);
+            const glow = ctx.createRadialGradient(rx, ry, 0, rx, ry, glowR);
+            glow.addColorStop(0, `hsla(${clusterHue}, ${config.saturation * 0.6}%, 55%, ${baseAlpha * 0.8 * pulse})`);
+            glow.addColorStop(1, `hsla(${clusterHue}, ${config.saturation * 0.4}%, 40%, 0)`);
+            ctx.beginPath();
+            ctx.arc(rx, ry, glowR, 0, Math.PI * 2);
+            ctx.fillStyle = glow;
+            ctx.fill();
+
+            // Small mushroom cluster (3-5 tiny fungi)
+            const clusterN = 3 + Math.floor(this.seededRandom(seed + 4) * 3);
+            for (let c = 0; c < clusterN; c++) {
+                const cSeed = seed + 10 + c;
+                const cOff = (this.seededRandom(cSeed) - 0.5) * glowR * 0.7;
+                const cOff2 = (this.seededRandom(cSeed + 1) - 0.5) * glowR * 0.5;
+                const mcx = rx + cOff;
+                const mcy = ry + cOff2;
+                const mCapW = maxDim * 0.005 * (0.6 + this.seededRandom(cSeed + 2) * 0.8 + pulse * 0.3);
+                const mCapH = mCapW * 0.5;
+                const mStipeH = mCapW * 1.2;
+
+                // Tiny stipe
+                ctx.beginPath();
+                ctx.moveTo(mcx, mcy);
+                ctx.lineTo(mcx, mcy + mStipeH);
+                ctx.strokeStyle = `hsla(${clusterHue}, ${config.saturation * 0.4}%, 50%, ${baseAlpha * 0.7})`;
+                ctx.lineWidth = mCapW * 0.15;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Tiny cap
+                ctx.beginPath();
+                ctx.ellipse(mcx, mcy, mCapW, mCapH, 0, Math.PI, 0);
+                ctx.fillStyle = `hsla(${(clusterHue + 20) % 360}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * (0.6 + pulse * 0.3)})`;
+                ctx.fill();
+            }
+        }
         ctx.restore();
     }
 
@@ -1285,6 +2379,18 @@ class KaleidoscopeStudio {
                 break;
             case 'fibonacci':
                 this.renderFibonacciStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                break;
+            case 'dmt':
+                this.renderDMTStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                break;
+            case 'sacred':
+                this.renderSacredStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                break;
+            case 'mycelial':
+                this.renderMycelialStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                break;
+            case 'fluid':
+                this.renderFluidStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
                 break;
             case 'geometric':
             default:
@@ -2640,6 +3746,1166 @@ class KaleidoscopeStudio {
             ctx.fillStyle = `hsla(${nodeHue}, ${config.saturation}%, ${78 + energy * 18}%, ${0.6 + energy * 0.35})`;
             ctx.fill();
         }
+    }
+
+    /**
+     * DMT style — "Hyperspace" recursive geometry
+     * Hyper-grid mesh, chrysanthemum cycloids, Penrose-like tiling, impossible solids,
+     * Lissajous breathing center, neon-saturated palette
+     */
+    renderDMTStyle(ctx, centerX, centerY, radius, numSides, hue, thickness) {
+        const config = this.config;
+        const seed = config.shapeSeed;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const mirrors = config.mirrors;
+        const rot = this.accumulatedRotation;
+
+        // Lissajous breathing offset for the "eye"
+        const breatheX = Math.sin(rot * 0.7) * radius * 0.06 * (1 + energy * 0.5);
+        const breatheY = Math.cos(rot * 1.1) * radius * 0.06 * (1 + energy * 0.5);
+        const eyeX = centerX + breatheX;
+        const eyeY = centerY + breatheY;
+
+        // Segment count oscillates with complexity (6-24 mapped from mirrors)
+        const segmentCount = Math.max(6, Math.min(24, mirrors * 2 + Math.floor(brightness * 8)));
+
+        // Seed-based variation
+        const rotDir = this.seededRandom(seed) > 0.5 ? 1 : -1;
+        const layerDepth = 2 + Math.floor(this.seededRandom(seed + 1) * 3);
+        const hueShift = this.seededRandom(seed + 2) * 80;
+        const hasImpossible = this.seededRandom(seed + 3) > 0.35;
+
+        // --- Hyper-Grid: Curved wireframe mesh toward singularity ---
+        for (let i = 0; i < segmentCount; i++) {
+            const segAngle = (Math.PI * 2 * i) / segmentCount + rot * 0.2 * rotDir;
+
+            ctx.save();
+            ctx.translate(eyeX, eyeY);
+            ctx.rotate(segAngle);
+
+            // Radial grid lines curving inward
+            const gridLines = 4 + Math.floor(energy * 3);
+            for (let g = 0; g < gridLines; g++) {
+                const gRatio = (g + 1) / gridLines;
+                const startR = radius * 0.15 * gRatio;
+                const endR = radius * (0.6 + gRatio * 0.4) * (0.9 + energy * 0.2);
+                const curve = Math.sin(rot * 1.5 + g) * radius * 0.08 * harmonic;
+                const gridHue = (hue + g * 30 + hueShift) % 360;
+
+                ctx.beginPath();
+                ctx.moveTo(startR, 0);
+                ctx.quadraticCurveTo(
+                    (startR + endR) / 2, curve,
+                    endR, 0
+                );
+                ctx.strokeStyle = `hsla(${gridHue}, ${Math.min(100, config.saturation * 1.2)}%, ${55 + energy * 25}%, ${0.3 + energy * 0.35})`;
+                ctx.lineWidth = thickness * (0.3 + gRatio * 0.4);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // Concentric arc rings (cross-grid)
+        const arcRings = 5 + Math.floor(energy * 3);
+        for (let r = 0; r < arcRings; r++) {
+            const arcR = radius * (0.2 + r * 0.15) * (0.85 + energy * 0.2);
+            const arcHue = (hue + r * 25 + brightness * 30 + hueShift) % 360;
+            const wobble = Math.sin(rot * 2 + r * 0.8) * 0.03 * energy;
+
+            ctx.beginPath();
+            ctx.arc(eyeX, eyeY, arcR * (1 + wobble), 0, Math.PI * 2);
+            ctx.strokeStyle = `hsla(${arcHue}, ${Math.min(100, config.saturation * 1.1)}%, ${50 + energy * 20}%, ${0.2 + energy * 0.25 - r * 0.02})`;
+            ctx.lineWidth = thickness * (0.4 + energy * 0.3);
+            ctx.stroke();
+        }
+
+        // --- Chrysanthemum: Dense cycloid flower at each mirror ---
+        for (let m = 0; m < mirrors; m++) {
+            const mirrorAngle = (Math.PI * 2 * m) / mirrors + rot * 0.3 * rotDir;
+            const orbitDist = config.orbitRadius * (0.5 + harmonic * 0.5);
+            const mx = eyeX + Math.cos(mirrorAngle) * orbitDist;
+            const my = eyeY + Math.sin(mirrorAngle) * orbitDist;
+
+            // Cycloid petals
+            const petalCount = 8 + Math.floor(this.seededRandom(seed + 10 + m) * 8);
+            const petalRadius = radius * 0.25 * (0.7 + this.seededRandom(seed + 11 + m) * 0.5);
+
+            ctx.save();
+            ctx.translate(mx, my);
+            ctx.rotate(mirrorAngle + rot * rotDir);
+
+            for (let p = 0; p < petalCount; p++) {
+                const pAngle = (Math.PI * 2 * p) / petalCount;
+                const petalHue = (hue + p * (360 / petalCount) + hueShift) % 360;
+                const pLen = petalRadius * (0.6 + energy * 0.5 + Math.sin(rot * 3 + p) * 0.15);
+
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                // Cycloid-like curve
+                const cp1x = Math.cos(pAngle - 0.4) * pLen * 0.5;
+                const cp1y = Math.sin(pAngle - 0.4) * pLen * 0.5;
+                const cp2x = Math.cos(pAngle + 0.2) * pLen * 0.9;
+                const cp2y = Math.sin(pAngle + 0.2) * pLen * 0.9;
+                const endX = Math.cos(pAngle) * pLen;
+                const endY = Math.sin(pAngle) * pLen;
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+
+                ctx.strokeStyle = `hsla(${petalHue}, ${Math.min(100, config.saturation * 1.3)}%, ${60 + energy * 25}%, ${0.35 + energy * 0.4})`;
+                ctx.lineWidth = thickness * (0.4 + energy * 0.3);
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // --- Impossible Solids: Hyper-cube wireframes at mirror positions ---
+        if (hasImpossible) {
+            for (let m = 0; m < mirrors; m++) {
+                const mirrorAngle = (Math.PI * 2 * m) / mirrors + rot * 0.15 * rotDir;
+                const dist = config.orbitRadius * 0.7;
+                const ix = eyeX + Math.cos(mirrorAngle) * dist;
+                const iy = eyeY + Math.sin(mirrorAngle) * dist;
+                const cubeSize = radius * 0.12 * (0.8 + this.seededRandom(seed + 20 + m) * 0.4);
+                const innerOffset = cubeSize * 0.5;
+                const cubeRot = rot * (1.2 + this.seededRandom(seed + 21 + m)) * rotDir;
+                const cubeHue = (hue + 120 + m * 30) % 360;
+
+                ctx.save();
+                ctx.translate(ix, iy);
+                ctx.rotate(cubeRot);
+
+                // Outer square
+                ctx.beginPath();
+                ctx.rect(-cubeSize, -cubeSize, cubeSize * 2, cubeSize * 2);
+                ctx.strokeStyle = `hsla(${cubeHue}, ${config.saturation}%, ${65 + energy * 20}%, ${0.3 + energy * 0.35})`;
+                ctx.lineWidth = thickness * 0.5;
+                ctx.stroke();
+
+                // Inner square (offset for 3D illusion)
+                ctx.beginPath();
+                ctx.rect(-cubeSize + innerOffset, -cubeSize + innerOffset, cubeSize * 2 - innerOffset * 2, cubeSize * 2 - innerOffset * 2);
+                ctx.strokeStyle = `hsla(${(cubeHue + 60) % 360}, ${config.saturation}%, ${55 + energy * 20}%, ${0.25 + energy * 0.3})`;
+                ctx.lineWidth = thickness * 0.4;
+                ctx.stroke();
+
+                // Connecting edges (impossible perspective)
+                const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+                for (const [cx, cy] of corners) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx * cubeSize, cy * cubeSize);
+                    ctx.lineTo(cx * (cubeSize - innerOffset), cy * (cubeSize - innerOffset));
+                    ctx.strokeStyle = `hsla(${(cubeHue + 30) % 360}, ${config.saturation * 0.9}%, ${60 + energy * 15}%, ${0.2 + energy * 0.25})`;
+                    ctx.lineWidth = thickness * 0.35;
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // --- Aperiodic tile accents: Penrose-like kite/dart shapes ---
+        for (let layer = 0; layer < layerDepth; layer++) {
+            const layerR = radius * (0.3 + layer * 0.25);
+            const tileCount = segmentCount;
+            const tileHue = (hue + layer * 50 + hueShift) % 360;
+
+            for (let t = 0; t < tileCount; t++) {
+                const tAngle = (Math.PI * 2 * t) / tileCount + rot * (0.1 + layer * 0.05) * rotDir;
+                const tx = eyeX + Math.cos(tAngle) * layerR;
+                const ty = eyeY + Math.sin(tAngle) * layerR;
+                const tSize = radius * 0.06 * (0.8 + energy * 0.4);
+
+                // Kite shape (Penrose-like)
+                ctx.save();
+                ctx.translate(tx, ty);
+                ctx.rotate(tAngle + rot * 0.5);
+
+                ctx.beginPath();
+                ctx.moveTo(0, -tSize * 1.618);
+                ctx.lineTo(tSize * 0.6, 0);
+                ctx.lineTo(0, tSize * 0.5);
+                ctx.lineTo(-tSize * 0.6, 0);
+                ctx.closePath();
+
+                ctx.strokeStyle = `hsla(${tileHue}, ${Math.min(100, config.saturation * 1.2)}%, ${55 + energy * 25}%, ${0.25 + energy * 0.3 - layer * 0.04})`;
+                ctx.lineWidth = thickness * (0.3 + energy * 0.2);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // Central eye — iridescent core
+        const eyeRadius = radius * 0.15 * (0.8 + energy * 0.5);
+        const eyeGrad = ctx.createRadialGradient(eyeX, eyeY, 0, eyeX, eyeY, eyeRadius);
+        eyeGrad.addColorStop(0, `hsla(${(hue + rot * 20) % 360}, ${Math.min(100, config.saturation * 1.3)}%, 70%, ${0.5 + energy * 0.4})`);
+        eyeGrad.addColorStop(0.5, `hsla(${(hue + 90 + rot * 20) % 360}, ${config.saturation}%, 55%, ${0.3 + energy * 0.3})`);
+        eyeGrad.addColorStop(1, `hsla(${(hue + 180 + rot * 20) % 360}, ${config.saturation}%, 40%, 0)`);
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, eyeRadius, 0, Math.PI * 2);
+        ctx.fillStyle = eyeGrad;
+        ctx.fill();
+    }
+
+    /**
+     * Sacred Geometry style — "Cloud Chamber / Radioactive Decay"
+     * Alpha/beta/gamma particle tracks, cloud chamber physics, Cherenkov glow,
+     * decay curves, snowflake kaleidoscope from chaotic tracks
+     */
+    renderSacredStyle(ctx, centerX, centerY, radius, numSides, hue, thickness) {
+        const config = this.config;
+        const seed = config.shapeSeed;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const mirrors = config.mirrors;
+        const rot = this.accumulatedRotation;
+
+        // Seed-based variation
+        const rotDir = this.seededRandom(seed) > 0.5 ? 1 : -1;
+        const hueShift = this.seededRandom(seed + 2) * 40;
+        const density = 4 + Math.floor(this.seededRandom(seed + 1) * 4);
+
+        // Archaic palette: amber, crimson, bone-white, blackened gold
+        const amberHue = 35;
+        const crimsonHue = 350;
+        const boneHue = 45;
+
+        // --- Kaleidoscope mirrored symbol rings ---
+        for (let m = 0; m < mirrors; m++) {
+            const mirrorAngle = (Math.PI * 2 * m) / mirrors + rot * 0.12 * rotDir;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(mirrorAngle);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Inner ring: large slow-rotating sigils
+            const innerCount = density;
+            for (let i = 0; i < innerCount; i++) {
+                const iSeed = seed + 100 + m * 30 + i * 7;
+                const iAngle = (this.seededRandom(iSeed) - 0.5) * (Math.PI / mirrors) * 0.8;
+                const iDist = radius * (0.1 + this.seededRandom(iSeed + 1) * 0.2);
+                const iSize = radius * (0.06 + this.seededRandom(iSeed + 2) * 0.05) * (0.8 + energy * 0.4);
+                const iType = Math.floor(this.seededRandom(iSeed + 3) * 16);
+                const iHue = (amberHue + this.seededRandom(iSeed + 4) * 30 + hueShift) % 360;
+                const ix = Math.cos(iAngle) * iDist;
+                const iy = Math.sin(iAngle) * iDist;
+                const iRot = rot * 0.3 * rotDir + this.seededRandom(iSeed + 5) * Math.PI;
+
+                ctx.save();
+                ctx.translate(ix, iy);
+                ctx.rotate(iRot);
+
+                // Glow aura behind large symbols
+                const glowR = iSize * 1.5;
+                const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowR);
+                glow.addColorStop(0, `hsla(${iHue}, ${config.saturation * 0.6}%, 55%, ${0.08 + energy * 0.12})`);
+                glow.addColorStop(1, `hsla(${iHue}, ${config.saturation * 0.4}%, 40%, 0)`);
+                ctx.beginPath();
+                ctx.arc(0, 0, glowR, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+
+                ctx.strokeStyle = `hsla(${iHue}, ${config.saturation * 0.7}%, ${55 + energy * 20}%, ${0.4 + energy * 0.35})`;
+                ctx.lineWidth = thickness * (0.6 + energy * 0.4);
+                this._drawOccultSymbol(ctx, iType, iSize);
+                ctx.restore();
+            }
+
+            // Middle ring: denser medium symbols
+            const midCount = density + 3;
+            for (let i = 0; i < midCount; i++) {
+                const mSeed = seed + 300 + m * 30 + i * 11;
+                const mAngle = (this.seededRandom(mSeed) - 0.5) * (Math.PI / mirrors);
+                const mDist = radius * (0.25 + this.seededRandom(mSeed + 1) * 0.3);
+                const mSize = radius * (0.03 + this.seededRandom(mSeed + 2) * 0.04) * (0.7 + harmonic * 0.5);
+                const mType = Math.floor(this.seededRandom(mSeed + 3) * 16);
+                const mHue = (crimsonHue + this.seededRandom(mSeed + 4) * 50 - 25 + hueShift) % 360;
+                const mx = Math.cos(mAngle) * mDist;
+                const my = Math.sin(mAngle) * mDist;
+                const mRot = rot * 0.5 * -rotDir + this.seededRandom(mSeed + 5) * Math.PI * 2;
+
+                ctx.save();
+                ctx.translate(mx, my);
+                ctx.rotate(mRot);
+                ctx.strokeStyle = `hsla(${mHue}, ${config.saturation * 0.6}%, ${50 + brightness * 15}%, ${0.3 + harmonic * 0.3})`;
+                ctx.lineWidth = thickness * (0.4 + harmonic * 0.3);
+                this._drawOccultSymbol(ctx, mType, mSize);
+                ctx.restore();
+            }
+
+            // Outer ring: overwhelming swarm of tiny symbols
+            const outerCount = density + 5 + Math.floor(energy * 4);
+            for (let i = 0; i < outerCount; i++) {
+                const oSeed = seed + 600 + m * 30 + i * 13;
+                const oAngle = (this.seededRandom(oSeed) - 0.5) * (Math.PI / mirrors);
+                const oDist = radius * (0.5 + this.seededRandom(oSeed + 1) * 0.4);
+                const oSize = radius * (0.015 + this.seededRandom(oSeed + 2) * 0.025) * (0.6 + brightness * 0.6);
+                const oType = Math.floor(this.seededRandom(oSeed + 3) * 16);
+                const oHue = (boneHue + this.seededRandom(oSeed + 4) * 40 + hueShift) % 360;
+                const ox = Math.cos(oAngle) * oDist;
+                const oy = Math.sin(oAngle) * oDist;
+                const oRot = rot * 0.8 * rotDir + this.seededRandom(oSeed + 5) * Math.PI * 2;
+
+                ctx.save();
+                ctx.translate(ox, oy);
+                ctx.rotate(oRot);
+                ctx.strokeStyle = `hsla(${oHue}, ${config.saturation * 0.5}%, ${45 + brightness * 20}%, ${0.2 + brightness * 0.3})`;
+                ctx.lineWidth = thickness * (0.25 + brightness * 0.2);
+                this._drawOccultSymbol(ctx, oType, oSize);
+                ctx.restore();
+            }
+
+            // Connecting filaments between symbols (arcane web)
+            if (harmonic > 0.2) {
+                const webCount = 3 + Math.floor(harmonic * 4);
+                for (let w = 0; w < webCount; w++) {
+                    const wSeed = seed + 900 + m * 20 + w;
+                    const a1 = (this.seededRandom(wSeed) - 0.5) * (Math.PI / mirrors);
+                    const d1 = radius * (0.1 + this.seededRandom(wSeed + 1) * 0.6);
+                    const a2 = (this.seededRandom(wSeed + 2) - 0.5) * (Math.PI / mirrors);
+                    const d2 = radius * (0.1 + this.seededRandom(wSeed + 3) * 0.6);
+                    const wHue = (amberHue + this.seededRandom(wSeed + 4) * 30) % 360;
+
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(a1) * d1, Math.sin(a1) * d1);
+                    const cpx = Math.cos((a1 + a2) / 2) * (d1 + d2) * 0.3;
+                    const cpy = Math.sin((a1 + a2) / 2) * (d1 + d2) * 0.3;
+                    ctx.quadraticCurveTo(cpx, cpy, Math.cos(a2) * d2, Math.sin(a2) * d2);
+                    ctx.strokeStyle = `hsla(${wHue}, ${config.saturation * 0.3}%, 40%, ${0.06 + harmonic * 0.1})`;
+                    ctx.lineWidth = 0.4 + harmonic * 0.3;
+                    ctx.stroke();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // --- Central all-seeing eye / vortex ---
+        const eyeR = radius * 0.1 * (0.7 + energy * 0.5);
+
+        // Outer glow ring
+        const eyeGlow = ctx.createRadialGradient(centerX, centerY, eyeR * 0.5, centerX, centerY, eyeR * 3);
+        eyeGlow.addColorStop(0, `hsla(${amberHue + hueShift}, ${config.saturation * 0.7}%, 50%, ${0.1 + energy * 0.15})`);
+        eyeGlow.addColorStop(1, `hsla(${crimsonHue}, ${config.saturation * 0.4}%, 30%, 0)`);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, eyeR * 3, 0, Math.PI * 2);
+        ctx.fillStyle = eyeGlow;
+        ctx.fill();
+
+        // Eye shape (almond)
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.15 * rotDir);
+
+        ctx.beginPath();
+        ctx.moveTo(-eyeR * 1.6, 0);
+        ctx.quadraticCurveTo(0, -eyeR * 1.0, eyeR * 1.6, 0);
+        ctx.quadraticCurveTo(0, eyeR * 1.0, -eyeR * 1.6, 0);
+        ctx.closePath();
+        ctx.strokeStyle = `hsla(${amberHue + hueShift}, ${config.saturation * 0.8}%, ${55 + energy * 20}%, ${0.5 + energy * 0.35})`;
+        ctx.lineWidth = thickness * (0.7 + energy * 0.5);
+        ctx.stroke();
+
+        // Iris
+        ctx.beginPath();
+        ctx.arc(0, 0, eyeR * 0.5, 0, Math.PI * 2);
+        const irisGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, eyeR * 0.5);
+        irisGrad.addColorStop(0, `hsla(${crimsonHue + hueShift}, ${config.saturation}%, ${40 + energy * 25}%, ${0.5 + energy * 0.4})`);
+        irisGrad.addColorStop(0.7, `hsla(${amberHue + hueShift}, ${config.saturation * 0.8}%, 35%, ${0.3 + energy * 0.25})`);
+        irisGrad.addColorStop(1, `hsla(0, 0%, 8%, ${0.4 + energy * 0.3})`);
+        ctx.fillStyle = irisGrad;
+        ctx.fill();
+
+        // Pupil
+        ctx.beginPath();
+        ctx.arc(0, 0, eyeR * 0.15, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(0, 0%, 2%, ${0.6 + energy * 0.3})`;
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    /**
+     * Helper: Draw one of 16 occult/alchemical symbols at origin
+     * Symbols: pentagram, hexagram, triangle variants, planetary glyphs,
+     * alchemical signs, runes, sigils, eye, ouroboros, infinity
+     */
+    _drawOccultSymbol(ctx, type, size) {
+        const s = size;
+        const PI = Math.PI;
+        ctx.beginPath();
+        switch (type) {
+            case 0: // Pentagram (5-pointed star)
+                for (let i = 0; i < 5; i++) {
+                    const a = -PI / 2 + (i * 2 * PI * 2) / 5;
+                    const x = Math.cos(a) * s;
+                    const y = Math.sin(a) * s;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                // Enclosing circle
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 1.05, 0, PI * 2);
+                ctx.stroke();
+                break;
+            case 1: // Hexagram (Star of David / Seal of Solomon)
+                // Up triangle
+                for (let i = 0; i < 3; i++) {
+                    const a = -PI / 2 + (i * PI * 2) / 3;
+                    const x = Math.cos(a) * s;
+                    const y = Math.sin(a) * s;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                // Down triangle
+                ctx.beginPath();
+                for (let i = 0; i < 3; i++) {
+                    const a = PI / 2 + (i * PI * 2) / 3;
+                    const x = Math.cos(a) * s;
+                    const y = Math.sin(a) * s;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                break;
+            case 2: // Fire triangle (up)
+                ctx.moveTo(0, -s);
+                ctx.lineTo(s * 0.85, s * 0.7);
+                ctx.lineTo(-s * 0.85, s * 0.7);
+                ctx.closePath();
+                ctx.stroke();
+                break;
+            case 3: // Water triangle (down)
+                ctx.moveTo(0, s);
+                ctx.lineTo(s * 0.85, -s * 0.7);
+                ctx.lineTo(-s * 0.85, -s * 0.7);
+                ctx.closePath();
+                ctx.stroke();
+                break;
+            case 4: // Sun / Gold (circle with dot)
+                ctx.arc(0, 0, s, 0, PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 0.15, 0, PI * 2);
+                ctx.stroke();
+                break;
+            case 5: // Crescent Moon / Silver
+                ctx.arc(0, 0, s, PI * 0.3, PI * 1.7);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(s * 0.3, 0, s * 0.75, PI * 0.35, PI * 1.65, true);
+                ctx.stroke();
+                break;
+            case 6: // Mercury (circle + cross + horns)
+                ctx.arc(0, 0, s * 0.5, 0, PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, s * 0.5);
+                ctx.lineTo(0, s);
+                ctx.moveTo(-s * 0.35, s * 0.75);
+                ctx.lineTo(s * 0.35, s * 0.75);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, -s * 0.5, s * 0.4, PI * 1.2, PI * 1.8);
+                ctx.stroke();
+                break;
+            case 7: // Venus / Copper (circle + cross below)
+                ctx.arc(0, -s * 0.2, s * 0.45, 0, PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, s * 0.25);
+                ctx.lineTo(0, s);
+                ctx.moveTo(-s * 0.3, s * 0.6);
+                ctx.lineTo(s * 0.3, s * 0.6);
+                ctx.stroke();
+                break;
+            case 8: // Mars / Iron (circle + arrow)
+                ctx.arc(-s * 0.15, s * 0.15, s * 0.5, 0, PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s * 0.2, -s * 0.2);
+                ctx.lineTo(s * 0.7, -s * 0.7);
+                ctx.lineTo(s * 0.7, -s * 0.35);
+                ctx.moveTo(s * 0.7, -s * 0.7);
+                ctx.lineTo(s * 0.35, -s * 0.7);
+                ctx.stroke();
+                break;
+            case 9: // Saturn / Lead (cross + curve)
+                ctx.moveTo(0, -s * 0.8);
+                ctx.lineTo(0, s * 0.6);
+                ctx.moveTo(-s * 0.35, -s * 0.3);
+                ctx.lineTo(s * 0.35, -s * 0.3);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(s * 0.25, -s * 0.6, s * 0.35, PI * 0.5, PI * 1.5, true);
+                ctx.stroke();
+                break;
+            case 10: // Triquetra (three interlocking arcs)
+                for (let i = 0; i < 3; i++) {
+                    const a = -PI / 2 + (i * PI * 2) / 3;
+                    const cx = Math.cos(a) * s * 0.35;
+                    const cy = Math.sin(a) * s * 0.35;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, s * 0.6, a - PI * 0.4, a + PI * 0.4);
+                    ctx.stroke();
+                }
+                break;
+            case 11: // Ouroboros (circle with arrowhead)
+                ctx.arc(0, 0, s * 0.7, PI * 0.1, PI * 1.95);
+                ctx.stroke();
+                // Arrow head at mouth
+                const hx = Math.cos(PI * 0.1) * s * 0.7;
+                const hy = Math.sin(PI * 0.1) * s * 0.7;
+                ctx.beginPath();
+                ctx.moveTo(hx + s * 0.15, hy - s * 0.1);
+                ctx.lineTo(hx, hy);
+                ctx.lineTo(hx + s * 0.15, hy + s * 0.12);
+                ctx.stroke();
+                break;
+            case 12: // Eye of Providence
+                ctx.moveTo(-s, 0);
+                ctx.quadraticCurveTo(0, -s * 0.8, s, 0);
+                ctx.quadraticCurveTo(0, s * 0.8, -s, 0);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 0.25, 0, PI * 2);
+                ctx.stroke();
+                break;
+            case 13: // Angular rune (Algiz-like)
+                ctx.moveTo(0, s);
+                ctx.lineTo(0, -s * 0.3);
+                ctx.lineTo(-s * 0.6, -s);
+                ctx.moveTo(0, -s * 0.3);
+                ctx.lineTo(s * 0.6, -s);
+                ctx.moveTo(0, s * 0.2);
+                ctx.lineTo(-s * 0.4, -s * 0.3);
+                ctx.moveTo(0, s * 0.2);
+                ctx.lineTo(s * 0.4, -s * 0.3);
+                ctx.stroke();
+                break;
+            case 14: // Infinity / Lemniscate
+                ctx.moveTo(0, 0);
+                ctx.bezierCurveTo(s * 0.5, -s * 0.7, s * 1.1, -s * 0.3, s * 0.6, 0);
+                ctx.bezierCurveTo(s * 0.2, s * 0.3, -s * 0.2, s * 0.7, -s * 0.6, 0);
+                ctx.bezierCurveTo(-s * 1.1, -s * 0.6, -s * 0.5, -s * 0.3, 0, 0);
+                ctx.stroke();
+                break;
+            case 15: // Sulfur / Leviathan cross
+            default:
+                // Cross with infinity loop at bottom
+                ctx.moveTo(0, -s);
+                ctx.lineTo(0, s * 0.3);
+                ctx.moveTo(-s * 0.45, -s * 0.3);
+                ctx.lineTo(s * 0.45, -s * 0.3);
+                ctx.stroke();
+                // Triangle at bottom
+                ctx.beginPath();
+                ctx.moveTo(0, -s * 0.5);
+                ctx.lineTo(-s * 0.4, s * 0.15);
+                ctx.lineTo(s * 0.4, s * 0.15);
+                ctx.closePath();
+                ctx.stroke();
+                // Infinity at base
+                ctx.beginPath();
+                ctx.arc(-s * 0.22, s * 0.65, s * 0.22, 0, PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(s * 0.22, s * 0.65, s * 0.22, 0, PI * 2);
+                ctx.stroke();
+                break;
+        }
+    }
+
+    /**
+     * Mycelial style — "Mushroom Colony"
+     * Clusters of bioluminescent mushrooms with glowing caps, gill detail,
+     * connecting mycelium threads, spore clouds, organic pulsing growth
+     */
+    renderMycelialStyle(ctx, centerX, centerY, radius, numSides, hue, thickness) {
+        const config = this.config;
+        const seed = config.shapeSeed;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const mirrors = config.mirrors;
+        const rot = this.accumulatedRotation;
+
+        // Seed-based variation
+        const rotDir = this.seededRandom(seed) > 0.5 ? 1 : -1;
+        const hueShift = this.seededRandom(seed + 2) * 40;
+        const clusterDensity = 2 + Math.floor(this.seededRandom(seed + 1) * 2);
+
+        // Bioluminescent palette
+        const cyanHue = 180;
+        const amethystHue = 275;
+        const forestHue = 120;
+
+        // Breathing pulse
+        const breathe = (phase) => 1 + Math.sin(rot * 2 + phase) * 0.2 * (0.5 + harmonic * 0.5);
+
+        // --- Kaleidoscope mirrored mushroom clusters ---
+        for (let m = 0; m < mirrors; m++) {
+            const mirrorAngle = (Math.PI * 2 * m) / mirrors + rot * 0.15 * rotDir;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(mirrorAngle);
+
+            // Mycelium threads connecting clusters (drawn first, underneath)
+            const threadCount = 3 + Math.floor(this.seededRandom(seed + 10 + m) * 3);
+            for (let t = 0; t < threadCount; t++) {
+                const tSeed = seed + 50 + m * 20 + t * 7;
+                const t1Angle = (this.seededRandom(tSeed) - 0.5) * (Math.PI / mirrors) * 0.9;
+                const t1Dist = radius * (0.05 + this.seededRandom(tSeed + 1) * 0.15);
+                const t2Angle = (this.seededRandom(tSeed + 2) - 0.5) * (Math.PI / mirrors) * 0.9;
+                const t2Dist = radius * (0.25 + this.seededRandom(tSeed + 3) * 0.5);
+                const threadHue = (cyanHue + this.seededRandom(tSeed + 4) * 30 + hueShift) % 360;
+                const pulseFactor = breathe(this.seededRandom(tSeed + 5) * Math.PI * 2);
+
+                const x1 = Math.cos(t1Angle) * t1Dist;
+                const y1 = Math.sin(t1Angle) * t1Dist;
+                const x2 = Math.cos(t2Angle) * t2Dist;
+                const y2 = Math.sin(t2Angle) * t2Dist;
+                const cpx = (x1 + x2) / 2 + (this.seededRandom(tSeed + 6) - 0.5) * radius * 0.15;
+                const cpy = (y1 + y2) / 2 + (this.seededRandom(tSeed + 7) - 0.5) * radius * 0.15;
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.quadraticCurveTo(cpx, cpy, x2, y2);
+                ctx.strokeStyle = `hsla(${threadHue}, ${config.saturation * 0.5}%, ${40 + energy * 15}%, ${0.12 + harmonic * 0.15})`;
+                ctx.lineWidth = (0.5 + harmonic * 0.8) * pulseFactor;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+
+            // Mushroom clusters at various distances
+            const clusterCount = clusterDensity;
+            for (let c = 0; c < clusterCount; c++) {
+                const cSeed = seed + 200 + m * 40 + c * 17;
+                const cAngle = (this.seededRandom(cSeed) - 0.5) * (Math.PI / mirrors) * 0.85;
+                const cDist = radius * (0.12 + c * 0.2 + this.seededRandom(cSeed + 1) * 0.12);
+                const cx = Math.cos(cAngle) * cDist;
+                const cy = Math.sin(cAngle) * cDist;
+
+                // 2-5 mushrooms per cluster
+                const mushCount = 2 + Math.floor(this.seededRandom(cSeed + 2) * 4);
+                for (let f = 0; f < mushCount; f++) {
+                    const fSeed = cSeed + 10 + f * 13;
+                    const fOff = (this.seededRandom(fSeed) - 0.5) * radius * 0.06;
+                    const fOff2 = (this.seededRandom(fSeed + 1) - 0.5) * radius * 0.04;
+                    const fx = cx + fOff;
+                    const fy = cy + fOff2;
+
+                    // Size varies — one dominant, others smaller
+                    const sizeMultiplier = f === 0 ? 1.0 : (0.35 + this.seededRandom(fSeed + 2) * 0.4);
+                    const capW = radius * (0.025 + this.seededRandom(fSeed + 3) * 0.025) * sizeMultiplier
+                        * (0.8 + energy * 0.3) * breathe(fSeed * 0.1);
+                    const capH = capW * (0.45 + this.seededRandom(fSeed + 4) * 0.2);
+                    const stipeH = capW * (1.0 + this.seededRandom(fSeed + 5) * 0.8);
+                    const stipeW = capW * (0.12 + this.seededRandom(fSeed + 6) * 0.08);
+                    const lean = (this.seededRandom(fSeed + 7) - 0.5) * 0.3;
+                    const capHue = (amethystHue + this.seededRandom(fSeed + 8) * 50 - 25 + hueShift) % 360;
+                    const stipeHue = (forestHue + this.seededRandom(fSeed + 9) * 30 + hueShift) % 360;
+
+                    ctx.save();
+                    ctx.translate(fx, fy);
+                    ctx.rotate(lean);
+
+                    // Bioluminescent ground glow beneath mushroom
+                    if (sizeMultiplier > 0.6) {
+                        const gR = capW * 2.5;
+                        const gGrad = ctx.createRadialGradient(0, stipeH * 0.3, 0, 0, stipeH * 0.3, gR);
+                        gGrad.addColorStop(0, `hsla(${cyanHue + hueShift}, ${config.saturation * 0.5}%, 50%, ${0.05 + energy * 0.08})`);
+                        gGrad.addColorStop(1, `hsla(${cyanHue + hueShift}, ${config.saturation * 0.3}%, 35%, 0)`);
+                        ctx.beginPath();
+                        ctx.arc(0, stipeH * 0.3, gR, 0, Math.PI * 2);
+                        ctx.fillStyle = gGrad;
+                        ctx.fill();
+                    }
+
+                    // Stipe (stem) — slight organic taper
+                    ctx.beginPath();
+                    ctx.moveTo(-stipeW, 0);
+                    ctx.quadraticCurveTo(-stipeW * 1.3, stipeH * 0.5, -stipeW * 0.7, stipeH);
+                    ctx.lineTo(stipeW * 0.7, stipeH);
+                    ctx.quadraticCurveTo(stipeW * 1.3, stipeH * 0.5, stipeW, 0);
+                    ctx.closePath();
+                    ctx.fillStyle = `hsla(${stipeHue}, ${config.saturation * 0.35}%, ${42 + energy * 12}%, ${0.3 + energy * 0.25})`;
+                    ctx.fill();
+
+                    // Cap (dome) with SSS glow
+                    const capGrad = ctx.createRadialGradient(0, -capH * 0.4, capW * 0.1, 0, 0, capW);
+                    capGrad.addColorStop(0, `hsla(${capHue}, ${config.saturation * 0.8}%, ${65 + energy * 15}%, ${0.4 + energy * 0.3})`);
+                    capGrad.addColorStop(0.5, `hsla(${capHue}, ${config.saturation * 0.7}%, ${50 + brightness * 10}%, ${0.35 + energy * 0.25})`);
+                    capGrad.addColorStop(1, `hsla(${(capHue + 20) % 360}, ${config.saturation * 0.5}%, 35%, ${0.15 + energy * 0.1})`);
+
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, capW, capH, 0, Math.PI, 0);
+                    ctx.fillStyle = capGrad;
+                    ctx.fill();
+
+                    // Cap rim / edge highlight
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, capW, capH, 0, Math.PI, 0);
+                    ctx.strokeStyle = `hsla(${capHue}, ${config.saturation * 0.7}%, ${60 + brightness * 15}%, ${0.2 + energy * 0.25})`;
+                    ctx.lineWidth = thickness * 0.25;
+                    ctx.stroke();
+
+                    // Gill lines (radial underneath cap)
+                    if (sizeMultiplier > 0.5) {
+                        const gillCount = 5 + Math.floor(capW / (radius * 0.005));
+                        for (let g = 0; g < gillCount; g++) {
+                            const gFrac = g / gillCount;
+                            const gx = -capW * 0.85 + gFrac * capW * 1.7;
+                            ctx.beginPath();
+                            ctx.moveTo(gx, 0);
+                            ctx.lineTo(gx * 0.4, capH * 0.4);
+                            ctx.strokeStyle = `hsla(${(capHue - 15 + 360) % 360}, ${config.saturation * 0.5}%, 50%, ${0.08 + energy * 0.08})`;
+                            ctx.lineWidth = 0.3 + energy * 0.2;
+                            ctx.stroke();
+                        }
+                    }
+
+                    // Cap spots (for larger mushrooms)
+                    if (sizeMultiplier > 0.7 && this.seededRandom(fSeed + 10) > 0.4) {
+                        const spotCount = 2 + Math.floor(this.seededRandom(fSeed + 11) * 3);
+                        for (let sp = 0; sp < spotCount; sp++) {
+                            const spSeed = fSeed + 20 + sp;
+                            const spx = (this.seededRandom(spSeed) - 0.5) * capW * 1.2;
+                            const spy = -capH * (0.2 + this.seededRandom(spSeed + 1) * 0.5);
+                            const spR = capW * (0.06 + this.seededRandom(spSeed + 2) * 0.08);
+                            ctx.beginPath();
+                            ctx.arc(spx, spy, spR, 0, Math.PI * 2);
+                            ctx.fillStyle = `hsla(${(capHue + 40) % 360}, ${config.saturation * 0.4}%, ${70 + brightness * 10}%, ${0.15 + energy * 0.15})`;
+                            ctx.fill();
+                        }
+                    }
+
+                    ctx.restore();
+                }
+            }
+
+            // Spore clouds rising from caps
+            if (energy > 0.2) {
+                const sporeCount = 3 + Math.floor(energy * 8);
+                for (let s = 0; s < sporeCount; s++) {
+                    const sSeed = seed + 500 + m * 15 + s;
+                    const sDist = radius * (0.08 + this.seededRandom(sSeed) * 0.55);
+                    const sAngle = (this.seededRandom(sSeed + 1) - 0.5) * (Math.PI / mirrors);
+                    const drift = Math.sin(rot * 2.5 + this.seededRandom(sSeed + 2) * Math.PI * 2) * radius * 0.03;
+                    const rise = -Math.abs(Math.sin(rot * 1.5 + this.seededRandom(sSeed + 3) * Math.PI)) * radius * 0.04;
+                    const sx = Math.cos(sAngle) * (sDist + drift);
+                    const sy = Math.sin(sAngle) * (sDist + drift) + rise;
+                    const sporeSize = radius * 0.004 * (0.5 + energy * 0.8);
+                    const sporeHue = (amethystHue + this.seededRandom(sSeed + 4) * 40 + hueShift) % 360;
+                    const sporePhase = this.seededRandom(sSeed + 5) * Math.PI * 2;
+                    const sporePulse = 0.5 + Math.sin(rot * 3 + sporePhase) * 0.5;
+
+                    // Soft glowing spore
+                    const spGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sporeSize * 4);
+                    spGrad.addColorStop(0, `hsla(${sporeHue}, ${config.saturation * 0.7}%, 70%, ${(0.15 + energy * 0.3) * sporePulse})`);
+                    spGrad.addColorStop(1, `hsla(${sporeHue}, ${config.saturation * 0.4}%, 55%, 0)`);
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sporeSize * 4, 0, Math.PI * 2);
+                    ctx.fillStyle = spGrad;
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sporeSize, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsla(${sporeHue}, ${config.saturation * 0.8}%, 80%, ${(0.25 + energy * 0.35) * sporePulse})`;
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // --- Central mushroom cluster (focal point) ---
+        const coreBreath = breathe(0);
+        const coreCapW = radius * 0.08 * (0.7 + harmonic * 0.4) * coreBreath;
+        const coreCapH = coreCapW * 0.5;
+        const coreStipeH = coreCapW * 1.2;
+        const coreCHue = (amethystHue + hueShift) % 360;
+
+        // Bioluminescent pool
+        const poolR = coreCapW * 3;
+        const poolGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, poolR);
+        poolGrad.addColorStop(0, `hsla(${cyanHue + hueShift}, ${config.saturation * 0.7}%, 55%, ${0.12 + energy * 0.15})`);
+        poolGrad.addColorStop(0.5, `hsla(${amethystHue + hueShift}, ${config.saturation * 0.5}%, 40%, ${0.06 + energy * 0.08})`);
+        poolGrad.addColorStop(1, `hsla(${coreCHue}, ${config.saturation * 0.3}%, 25%, 0)`);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, poolR, 0, Math.PI * 2);
+        ctx.fillStyle = poolGrad;
+        ctx.fill();
+
+        // Central stipe
+        ctx.beginPath();
+        ctx.moveTo(centerX - coreCapW * 0.1, centerY);
+        ctx.quadraticCurveTo(centerX - coreCapW * 0.15, centerY + coreStipeH * 0.5, centerX - coreCapW * 0.06, centerY + coreStipeH);
+        ctx.lineTo(centerX + coreCapW * 0.06, centerY + coreStipeH);
+        ctx.quadraticCurveTo(centerX + coreCapW * 0.15, centerY + coreStipeH * 0.5, centerX + coreCapW * 0.1, centerY);
+        ctx.closePath();
+        ctx.fillStyle = `hsla(${(coreCHue - 30 + 360) % 360}, ${config.saturation * 0.4}%, ${40 + energy * 15}%, ${0.35 + energy * 0.25})`;
+        ctx.fill();
+
+        // Central cap
+        const ccGrad = ctx.createRadialGradient(centerX, centerY - coreCapH * 0.5, 0, centerX, centerY, coreCapW);
+        ccGrad.addColorStop(0, `hsla(${coreCHue}, ${config.saturation * 0.9}%, ${65 + energy * 15}%, ${0.5 + energy * 0.35})`);
+        ccGrad.addColorStop(0.6, `hsla(${coreCHue}, ${config.saturation * 0.7}%, ${50 + brightness * 10}%, ${0.35 + energy * 0.25})`);
+        ccGrad.addColorStop(1, `hsla(${(coreCHue + 30) % 360}, ${config.saturation * 0.4}%, 35%, 0)`);
+
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, coreCapW, coreCapH, 0, Math.PI, 0);
+        ctx.fillStyle = ccGrad;
+        ctx.fill();
+        ctx.strokeStyle = `hsla(${coreCHue}, ${config.saturation * 0.7}%, ${60 + brightness * 15}%, ${0.3 + energy * 0.3})`;
+        ctx.lineWidth = thickness * 0.3;
+        ctx.stroke();
+    }
+
+    /**
+     * Fluid background — 3-layer metallic parallax (surface tension rings, mercury tendrils, chrome droplets)
+     */
+    renderFluidBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const maxDim = Math.max(width, height) * 0.75;
+        const rot = this._bgFractalRotation;
+        const accentHsl = this.hexToHsl(config.accentColor);
+        const bgHue = accentHsl.h;
+        const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
+        const chromeSat = config.saturation * 0.15;
+
+        // --- FAR LAYER (0.15x): Surface Tension Rings ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 0.15);
+
+        for (let i = 0; i < 6; i++) {
+            const ringRadius = maxDim * (0.15 + i * 0.12);
+            const ringHue = (bgHue + i * 15) % 360;
+            const wobbleAmp = maxDim * 0.008 * (1 + harmonic * 2 + i * 0.3);
+            const segments = 64;
+
+            ctx.beginPath();
+            for (let s = 0; s <= segments; s++) {
+                const angle = (Math.PI * 2 * s) / segments;
+                const wobble = Math.sin(angle * 3 + rot * 0.8 + i) * wobbleAmp
+                    + Math.sin(angle * 7 + rot * 1.2 - i * 0.5) * wobbleAmp * 0.5;
+                const r = ringRadius + wobble;
+                const x = Math.cos(angle) * r;
+                const y = Math.sin(angle) * r;
+                if (s === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = `hsla(${ringHue}, ${chromeSat}%, ${55 + i * 4}%, ${baseAlpha * (0.8 - i * 0.08)})`;
+            ctx.lineWidth = 1.2 + energy * reactivity * 0.8 - i * 0.1;
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // --- MID LAYER (-0.5x, counter-rotate): Mercury Tendrils ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(-rot * 0.5);
+
+        for (let i = 0; i < 10; i++) {
+            const seed = i * 37 + 89;
+            const startAngle = this.seededRandom(seed) * Math.PI * 2;
+            const flowPhase = rot * (0.3 + this.seededRandom(seed + 1) * 0.4);
+            const tendrilLen = maxDim * (0.3 + this.seededRandom(seed + 2) * 0.5);
+            const tendrilHue = (bgHue + 180 + this.seededRandom(seed + 3) * 30 - 15) % 360;
+
+            const startR = maxDim * (0.05 + this.seededRandom(seed + 4) * 0.2);
+            const sx = Math.cos(startAngle + flowPhase) * startR;
+            const sy = Math.sin(startAngle + flowPhase) * startR;
+            const endAngle = startAngle + (this.seededRandom(seed + 5) - 0.5) * 1.5;
+            const ex = Math.cos(endAngle + flowPhase * 0.7) * (startR + tendrilLen);
+            const ey = Math.sin(endAngle + flowPhase * 0.7) * (startR + tendrilLen);
+            const cpx = (sx + ex) / 2 + (this.seededRandom(seed + 6) - 0.5) * tendrilLen * 0.6;
+            const cpy = (sy + ey) / 2 + (this.seededRandom(seed + 7) - 0.5) * tendrilLen * 0.6;
+
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.quadraticCurveTo(cpx, cpy, ex, ey);
+            ctx.strokeStyle = `hsla(${tendrilHue}, ${chromeSat}%, ${50 + brightness * 15}%, ${baseAlpha * 0.7})`;
+            ctx.lineWidth = 1 + harmonic * 1.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // --- NEAR LAYER (1.0x): Chrome Droplet Spray ---
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot * 1.0);
+
+        for (let i = 0; i < 22; i++) {
+            const seed = i * 23 + 197;
+            const dist = maxDim * (0.1 + this.seededRandom(seed) * 0.9);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const phase = this.seededRandom(seed + 2) * Math.PI * 2;
+            const baseSize = maxDim * (0.005 + this.seededRandom(seed + 3) * 0.008);
+            const pulse = 0.7 + Math.sin(rot * 4 + phase) * 0.3;
+            const dropSize = baseSize * pulse * (0.8 + energy * reactivity * 0.5);
+            const dropHue = (bgHue + this.seededRandom(seed + 4) * 40) % 360;
+
+            const dx = Math.cos(angle) * dist;
+            const dy = Math.sin(angle) * dist;
+
+            // Halo
+            const haloGrad = ctx.createRadialGradient(dx, dy, 0, dx, dy, dropSize * 3);
+            haloGrad.addColorStop(0, `hsla(${dropHue}, ${chromeSat}%, 60%, ${baseAlpha * 0.5 * pulse})`);
+            haloGrad.addColorStop(1, `hsla(${dropHue}, ${chromeSat}%, 45%, 0)`);
+            ctx.beginPath();
+            ctx.arc(dx, dy, dropSize * 3, 0, Math.PI * 2);
+            ctx.fillStyle = haloGrad;
+            ctx.fill();
+
+            // Bright specular core
+            ctx.beginPath();
+            ctx.arc(dx, dy, dropSize * 0.5, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${dropHue}, ${chromeSat * 0.5}%, 90%, ${baseAlpha * 1.2 * pulse})`;
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Fluid style — Liquid mercury / ferrofluid with metaball fusion, chrome shading, phase transitions
+     */
+    renderFluidStyle(ctx, centerX, centerY, radius, numSides, hue, thickness) {
+        const config = this.config;
+        const seed = config.shapeSeed;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const mirrors = config.mirrors;
+        const rot = this.accumulatedRotation;
+
+        // --- Phase system (continuous blend) ---
+        const totalEnergy = energy * 0.5 + harmonic * 0.3 + brightness * 0.2;
+        const phaseLiquid = Math.min(1, totalEnergy * 1.5);
+        const phaseGas = Math.max(0, Math.min(1, (totalEnergy - 0.5) * 2));
+
+        // --- Chrome palette ---
+        const chromeSat = config.saturation * 0.15;
+        const highlightHue = (hue + 40) % 360;
+        const shadowHue = (hue + 200) % 360;
+
+        // Seed-based variation
+        const rotDir = this.seededRandom(seed) > 0.5 ? 1 : -1;
+        const blobCountBase = 3 + Math.floor(this.seededRandom(seed + 1) * 3);
+        const wobbleFreq = 1.5 + this.seededRandom(seed + 2) * 1.5;
+
+        // Light source angle for specular highlights
+        const lightAngle = rot * 0.3;
+
+        // --- Mirror segments ---
+        for (let m = 0; m < mirrors; m++) {
+            const mirrorAngle = (Math.PI * 2 * m) / mirrors + rot * 0.15 * rotDir;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(mirrorAngle);
+
+            // 1. Central mass blob — large, sluggish, shrinks with energy
+            const massRadius = radius * (0.18 - totalEnergy * 0.08) * (1 - phaseGas * 0.6);
+            if (massRadius > 2) {
+                const wobbleX = Math.sin(rot * wobbleFreq) * radius * 0.02 * phaseLiquid;
+                const wobbleY = Math.cos(rot * wobbleFreq * 0.7) * radius * 0.015 * phaseLiquid;
+                const mx = wobbleX;
+                const my = wobbleY;
+
+                const massGrad = ctx.createRadialGradient(
+                    mx - massRadius * 0.3, my - massRadius * 0.3, 0,
+                    mx, my, massRadius
+                );
+                const massLight = 30 + phaseLiquid * 30;
+                const massAlpha = 0.25 + phaseLiquid * 0.35 - phaseGas * 0.2;
+                massGrad.addColorStop(0, `hsla(${highlightHue}, ${chromeSat}%, ${massLight + 25}%, ${massAlpha})`);
+                massGrad.addColorStop(0.5, `hsla(${hue}, ${chromeSat}%, ${massLight}%, ${massAlpha})`);
+                massGrad.addColorStop(0.85, `hsla(${shadowHue}, ${chromeSat}%, ${massLight + 15}%, ${massAlpha * 1.1})`);
+                massGrad.addColorStop(1, `hsla(${shadowHue}, ${chromeSat}%, ${massLight + 5}%, ${massAlpha * 0.3})`);
+
+                ctx.beginPath();
+                ctx.arc(mx, my, massRadius, 0, Math.PI * 2);
+                ctx.fillStyle = massGrad;
+                ctx.fill();
+            }
+
+            // 2. Orbital metaballs — 'lighter' composite for visual fusion
+            const blobCount = blobCountBase + Math.floor(energy * 4);
+            const prevComposite = ctx.globalCompositeOperation;
+            ctx.globalCompositeOperation = 'lighter';
+
+            for (let b = 0; b < blobCount; b++) {
+                const bSeed = seed + 100 + m * 50 + b * 13;
+                const orbitBase = radius * (0.12 + this.seededRandom(bSeed) * 0.25);
+                const orbitDist = orbitBase * (1 + phaseLiquid * 0.6 + harmonic * 0.3);
+                const blobAngle = this.seededRandom(bSeed + 1) * (Math.PI / mirrors)
+                    + Math.sin(rot * (0.5 + this.seededRandom(bSeed + 2) * 0.5)) * 0.2;
+                const blobSize = radius * (0.03 + this.seededRandom(bSeed + 3) * 0.04)
+                    * (0.7 + harmonic * 0.5 + Math.sin(rot * 2 + this.seededRandom(bSeed + 4) * Math.PI * 2) * 0.15);
+
+                const bx = Math.cos(blobAngle) * orbitDist;
+                const by = Math.sin(blobAngle) * orbitDist;
+
+                // Fresnel rim gradient (brighter at edges)
+                const blobGrad = ctx.createRadialGradient(
+                    bx + Math.cos(lightAngle) * blobSize * 0.3,
+                    by + Math.sin(lightAngle) * blobSize * 0.3,
+                    blobSize * 0.1,
+                    bx, by, blobSize
+                );
+                const blobHue = (hue + this.seededRandom(bSeed + 5) * 20 - 10) % 360;
+                const blobAlpha = 0.12 + phaseLiquid * 0.15;
+                blobGrad.addColorStop(0, `hsla(${highlightHue}, ${chromeSat * 0.5}%, 85%, ${blobAlpha * 0.6})`);
+                blobGrad.addColorStop(0.4, `hsla(${blobHue}, ${chromeSat}%, 50%, ${blobAlpha * 0.4})`);
+                blobGrad.addColorStop(0.85, `hsla(${blobHue}, ${chromeSat}%, 60%, ${blobAlpha * 0.9})`);
+                blobGrad.addColorStop(1, `hsla(${shadowHue}, ${chromeSat}%, 40%, 0)`);
+
+                ctx.beginPath();
+                ctx.arc(bx, by, blobSize, 0, Math.PI * 2);
+                ctx.fillStyle = blobGrad;
+                ctx.fill();
+
+                // Specular highlight dot
+                const specX = bx + Math.cos(lightAngle) * blobSize * 0.35;
+                const specY = by + Math.sin(lightAngle) * blobSize * 0.35;
+                const specSize = blobSize * 0.2;
+                ctx.beginPath();
+                ctx.arc(specX, specY, specSize, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(0, 0%, 95%, ${(0.15 + brightness * 0.25) * phaseLiquid})`;
+                ctx.fill();
+            }
+
+            ctx.globalCompositeOperation = prevComposite;
+
+            // 3. Shatter beads — tiny chrome droplets when energy > 0.5
+            if (energy > 0.5) {
+                const shatterCount = Math.floor((energy - 0.5) * 12) + 2;
+                for (let s = 0; s < shatterCount; s++) {
+                    const sSeed = seed + 300 + m * 30 + s * 7;
+                    const sDist = radius * (0.3 + this.seededRandom(sSeed) * 0.4 + energy * 0.15);
+                    const sAngle = this.seededRandom(sSeed + 1) * (Math.PI / mirrors);
+                    const sSize = radius * 0.008 * (0.5 + this.seededRandom(sSeed + 2) * 0.5 + energy * 0.5);
+                    const sx = Math.cos(sAngle) * sDist;
+                    const sy = Math.sin(sAngle) * sDist;
+                    const sHue = (hue + this.seededRandom(sSeed + 3) * 30) % 360;
+
+                    const beadGrad = ctx.createRadialGradient(
+                        sx - sSize * 0.3, sy - sSize * 0.3, 0,
+                        sx, sy, sSize
+                    );
+                    beadGrad.addColorStop(0, `hsla(${highlightHue}, ${chromeSat * 0.5}%, 90%, ${0.3 + energy * 0.3})`);
+                    beadGrad.addColorStop(0.6, `hsla(${sHue}, ${chromeSat}%, 55%, ${0.2 + energy * 0.2})`);
+                    beadGrad.addColorStop(1, `hsla(${shadowHue}, ${chromeSat}%, 35%, 0)`);
+
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sSize, 0, Math.PI * 2);
+                    ctx.fillStyle = beadGrad;
+                    ctx.fill();
+                }
+            }
+
+            // 4. Needle spikes — sharp triangles from blob surfaces when brightness > 0.4
+            if (brightness > 0.4) {
+                const spikeCount = 2 + Math.floor(brightness * 6);
+                for (let n = 0; n < spikeCount; n++) {
+                    const nSeed = seed + 500 + m * 20 + n * 11;
+                    const spikeBaseAngle = this.seededRandom(nSeed) * (Math.PI / mirrors);
+                    const spikeBaseDist = radius * (0.08 + this.seededRandom(nSeed + 1) * 0.2);
+                    const spikeLen = radius * (0.06 + brightness * 0.12) * (0.5 + this.seededRandom(nSeed + 2) * 0.5);
+                    const spikeWidth = radius * 0.008 * (0.5 + energy * 0.5);
+                    const spikeDir = spikeBaseAngle + (this.seededRandom(nSeed + 3) - 0.5) * 0.4;
+
+                    const nbx = Math.cos(spikeBaseAngle) * spikeBaseDist;
+                    const nby = Math.sin(spikeBaseAngle) * spikeBaseDist;
+                    const tipX = nbx + Math.cos(spikeDir) * spikeLen;
+                    const tipY = nby + Math.sin(spikeDir) * spikeLen;
+                    const perpAngle = spikeDir + Math.PI / 2;
+
+                    ctx.beginPath();
+                    ctx.moveTo(nbx + Math.cos(perpAngle) * spikeWidth, nby + Math.sin(perpAngle) * spikeWidth);
+                    ctx.lineTo(tipX, tipY);
+                    ctx.lineTo(nbx - Math.cos(perpAngle) * spikeWidth, nby - Math.sin(perpAngle) * spikeWidth);
+                    ctx.closePath();
+
+                    const spikeGrad = ctx.createLinearGradient(nbx, nby, tipX, tipY);
+                    spikeGrad.addColorStop(0, `hsla(${highlightHue}, ${chromeSat}%, 70%, ${0.2 + brightness * 0.3})`);
+                    spikeGrad.addColorStop(1, `hsla(${hue}, ${chromeSat}%, 50%, 0)`);
+                    ctx.fillStyle = spikeGrad;
+                    ctx.fill();
+                }
+            }
+
+            // 5. Edge pooling — chrome arc at segment boundary
+            const poolRadius = radius * 0.85;
+            const segmentAngle = Math.PI / mirrors;
+            const poolAlpha = 0.08 + energy * 0.15 + phaseLiquid * 0.1;
+            const poolWidth = thickness * (0.8 + energy * 0.6);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, poolRadius, -0.02, segmentAngle * 0.15);
+            ctx.strokeStyle = `hsla(${hue}, ${chromeSat}%, ${55 + brightness * 15}%, ${poolAlpha})`;
+            ctx.lineWidth = poolWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(0, 0, poolRadius, segmentAngle * 0.85, segmentAngle + 0.02);
+            ctx.strokeStyle = `hsla(${hue}, ${chromeSat}%, ${55 + brightness * 15}%, ${poolAlpha})`;
+            ctx.lineWidth = poolWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- Central wobbling mercury sphere (after mirror loop) ---
+        const coreRadius = radius * (0.12 + harmonic * 0.06 - energy * 0.04);
+        const coreWobX = Math.sin(rot * wobbleFreq * 1.3) * radius * 0.01;
+        const coreWobY = Math.cos(rot * wobbleFreq * 0.9) * radius * 0.008;
+
+        // Reverse-Fresnel: bright rim, dark center
+        const coreGrad = ctx.createRadialGradient(
+            centerX + coreWobX, centerY + coreWobY, 0,
+            centerX + coreWobX, centerY + coreWobY, coreRadius
+        );
+        const coreAlpha = 0.3 + phaseLiquid * 0.3 - phaseGas * 0.15;
+        coreGrad.addColorStop(0, `hsla(${shadowHue}, ${chromeSat}%, 25%, ${coreAlpha * 0.6})`);
+        coreGrad.addColorStop(0.6, `hsla(${hue}, ${chromeSat}%, 45%, ${coreAlpha})`);
+        coreGrad.addColorStop(0.9, `hsla(${highlightHue}, ${chromeSat * 0.5}%, 75%, ${coreAlpha * 1.1})`);
+        coreGrad.addColorStop(1, `hsla(${highlightHue}, ${chromeSat * 0.3}%, 85%, ${coreAlpha * 0.4})`);
+
+        ctx.beginPath();
+        ctx.arc(centerX + coreWobX, centerY + coreWobY, coreRadius, 0, Math.PI * 2);
+        ctx.fillStyle = coreGrad;
+        ctx.fill();
+
+        // Specular glint on core
+        const glintX = centerX + coreWobX + Math.cos(lightAngle) * coreRadius * 0.4;
+        const glintY = centerY + coreWobY + Math.sin(lightAngle) * coreRadius * 0.4;
+        const glintGrad = ctx.createRadialGradient(glintX, glintY, 0, glintX, glintY, coreRadius * 0.3);
+        glintGrad.addColorStop(0, `hsla(0, 0%, 100%, ${0.2 + brightness * 0.3})`);
+        glintGrad.addColorStop(1, `hsla(0, 0%, 100%, 0)`);
+        ctx.beginPath();
+        ctx.arc(glintX, glintY, coreRadius * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = glintGrad;
+        ctx.fill();
     }
 
     drawPolygon(ctx, x, y, radius, sides, rotation, color, thickness) {
