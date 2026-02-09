@@ -5075,32 +5075,6 @@ class KaleidoscopeStudio {
             ctx.lineCap = 'round';
             ctx.stroke();
 
-            // --- Brass armature from hub to body ---
-            const armAlpha = 0.25 + harmonic * 0.2;
-            // Jointed arm: hub → joint → body
-            const jointT = 0.4 + this.seededRandom(pSeed + 20) * 0.2;
-            const jx = px * jointT;
-            const jy = py * jointT;
-            // Segment 1: hub to joint
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(jx, jy);
-            ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.5}%, ${38 + harmonic * 15}%, ${armAlpha})`;
-            ctx.lineWidth = thickness * 0.4;
-            ctx.stroke();
-            // Segment 2: joint to body (slight offset for mechanical look)
-            ctx.beginPath();
-            ctx.moveTo(jx, jy);
-            ctx.lineTo(px, py);
-            ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, ${35 + harmonic * 12}%, ${armAlpha * 0.9})`;
-            ctx.lineWidth = thickness * 0.3;
-            ctx.stroke();
-            // Joint rivet
-            ctx.beginPath();
-            ctx.arc(jx, jy, 1.5 + energy * 0.8, 0, Math.PI * 2);
-            ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.5}%, 60%, ${0.4 + harmonic * 0.3})`;
-            ctx.fill();
-
             // --- Body rendering (self-rotating) ---
             ctx.save();
             ctx.translate(px, py);
@@ -5260,14 +5234,6 @@ class KaleidoscopeStudio {
                     ctx.lineWidth = 0.4;
                     ctx.stroke();
 
-                    // Tiny armature from planet to moon
-                    ctx.beginPath();
-                    ctx.moveTo(px, py);
-                    ctx.lineTo(moX, moY);
-                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.35}%, 45%, ${0.12 + harmonic * 0.1})`;
-                    ctx.lineWidth = 0.5;
-                    ctx.stroke();
-
                     // Moon body
                     ctx.beginPath();
                     ctx.arc(moX, moY, moonSize, 0, Math.PI * 2);
@@ -5280,12 +5246,6 @@ class KaleidoscopeStudio {
                         const subAngle = rot * (moonSpeed * 2.5) * -moonDir + this.seededRandom(moonSeed + 6) * Math.PI * 2;
                         const subX = moX + Math.cos(subAngle) * subOrbit;
                         const subY = moY + Math.sin(subAngle) * subOrbit;
-                        ctx.beginPath();
-                        ctx.moveTo(moX, moY);
-                        ctx.lineTo(subX, subY);
-                        ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.3}%, 42%, ${0.08 + harmonic * 0.06})`;
-                        ctx.lineWidth = 0.3;
-                        ctx.stroke();
                         ctx.beginPath();
                         ctx.arc(subX, subY, moonSize * 0.5, 0, Math.PI * 2);
                         ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.35}%, 65%, ${0.4 + energy * 0.2})`;
