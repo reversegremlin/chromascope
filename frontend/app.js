@@ -5001,276 +5001,338 @@ class KaleidoscopeStudio {
             ctx.stroke();
         }
 
-        // === CELESTIAL BODIES IN MIRROR SEGMENTS ===
-        for (let m = 0; m < mirrors; m++) {
-            const mirrorAngle = (Math.PI * 2 * m) / mirrors;
+        // === ORBITING CELESTIAL BODIES — true orrery motion ===
+        // Bodies orbit the center at Kepler-like speeds: inner = faster.
+        // Each body has its own orbital ring, eccentricity, and tilt.
+        // Armatures physically connect hub to each body and track them.
+        // Everything is then mirrored by the kaleidoscope.
+        const bodyCount = 3 + Math.floor(this.seededRandom(seed + 77) * 2);
+        const segAngle = Math.PI / mirrors;
 
-            ctx.save();
-            ctx.rotate(mirrorAngle);
+        for (let p = 0; p < bodyCount; p++) {
+            const pSeed = seed + p * 37;
+            const bodyType = Math.floor(this.seededRandom(pSeed + 99) * 6);
 
-            const segAngle = Math.PI / mirrors;
+            // Orbital parameters — each body unique
+            const orbitRadiusBase = radius * (0.15 + p * 0.13 + this.seededRandom(pSeed + 8) * 0.04) * orbitFactor;
+            const eccentricity = 0.05 + this.seededRandom(pSeed + 9) * 0.25;
+            // Kepler: orbital speed inversely proportional to radius^1.5
+            const keplerSpeed = 0.8 / Math.pow((0.15 + p * 0.13), 1.1);
+            const orbitDir = this.seededRandom(pSeed + 10) > 0.15 ? 1 : -1; // most prograde, some retrograde
+            // Orbital tilt (precession) — slow wobble of the orbit plane
+            const tiltAmp = 0.03 + this.seededRandom(pSeed + 11) * 0.06;
+            const tiltSpeed = 0.1 + this.seededRandom(pSeed + 12) * 0.15;
+            // Starting phase
+            const phaseOffset = this.seededRandom(pSeed + 13) * Math.PI * 2;
 
-            // --- Jointed brass armatures with bends ---
-            const armSeed = seed + m * 97;
-            const armCount = 1 + Math.floor(this.seededRandom(armSeed) * 2);
-            for (let a = 0; a < armCount; a++) {
-                const aS = armSeed + a * 31;
-                const armAngle = segAngle * (0.2 + this.seededRandom(aS) * 0.6);
-                const armLen = radius * (0.5 + this.seededRandom(aS + 1) * 0.25) * orbitFactor;
-                const jointT = 0.35 + this.seededRandom(aS + 2) * 0.3;
-                const bendAngle = (this.seededRandom(aS + 3) - 0.5) * 0.3;
+            // Current orbital angle — this is what makes them ORBIT
+            const orbitalAngle = rot * keplerSpeed * orbitDir + phaseOffset;
+            // Elliptical radius at current angle
+            const orbitR = orbitRadiusBase * (1 - eccentricity * Math.cos(orbitalAngle * 2));
+            // Slingshot from bass
+            const slingshot = energy * radius * 0.04 * orbitFactor;
+            const currentR = orbitR + slingshot;
+            // Precession tilt applied as slight angle offset
+            const tiltOffset = Math.sin(rot * tiltSpeed + p * 2) * tiltAmp;
+            const currentAngle = orbitalAngle + tiltOffset;
 
-                // Segment 1: center to joint
-                const jx = Math.cos(armAngle) * armLen * jointT;
-                const jy = Math.sin(armAngle) * armLen * jointT;
-                ctx.beginPath();
-                ctx.moveTo(radius * 0.08 * orbitFactor, 0);
-                ctx.lineTo(jx, jy);
-                ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.5}%, ${38 + harmonic * 15}%, ${0.25 + harmonic * 0.2})`;
-                ctx.lineWidth = thickness * 0.45;
-                ctx.stroke();
+            // Body position in absolute coords (before mirroring)
+            const px = Math.cos(currentAngle) * currentR;
+            const py = Math.sin(currentAngle) * currentR;
 
-                // Segment 2: joint to end (with bend)
-                const endAngle = armAngle + bendAngle;
-                const ex = jx + Math.cos(endAngle) * armLen * (1 - jointT);
-                const ey = jy + Math.sin(endAngle) * armLen * (1 - jointT);
-                ctx.beginPath();
-                ctx.moveTo(jx, jy);
-                ctx.lineTo(ex, ey);
-                ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, ${35 + harmonic * 12}%, ${0.2 + harmonic * 0.18})`;
-                ctx.lineWidth = thickness * 0.35;
-                ctx.stroke();
+            const bodySize = radius * (0.03 + this.seededRandom(pSeed + 1) * 0.035) * orbitFactor;
+            const bodyHue = (brassHue + this.seededRandom(pSeed + 2) * 70 - 10) % 360;
+            const selfSpin = rot * (0.5 + this.seededRandom(pSeed + 3) * 2) * (this.seededRandom(pSeed + 4) > 0.5 ? 1 : -1);
 
-                // Joint rivet
-                ctx.beginPath();
-                ctx.arc(jx, jy, 2 + energy, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.5}%, 60%, ${0.4 + harmonic * 0.3})`;
-                ctx.fill();
+            // --- Orbital path (etched trail) — full ellipse ---
+            ctx.beginPath();
+            const orbitSteps = 60;
+            for (let os = 0; os <= orbitSteps; os++) {
+                const oa = (Math.PI * 2 * os) / orbitSteps;
+                const oR = orbitRadiusBase * (1 - eccentricity * Math.cos(oa * 2));
+                const ox = Math.cos(oa) * oR;
+                const oy = Math.sin(oa) * oR;
+                os === 0 ? ctx.moveTo(ox, oy) : ctx.lineTo(ox, oy);
             }
+            ctx.closePath();
+            ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.25}%, 40%, ${0.04 + brightness * 0.04})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
 
-            // --- Varied celestial bodies: shape chosen by seed ---
-            // 0=armillary, 1=ringed(saturn), 2=crescent, 3=gear-cog, 4=asteroid cluster, 5=comet
-            const bodyCount = 2 + Math.floor(this.seededRandom(seed + m * 7) * 2);
-            for (let p = 0; p < bodyCount; p++) {
-                const pSeed = seed + m * 50 + p * 13;
-                const bodyType = Math.floor(this.seededRandom(pSeed + 99) * 6);
-                const pAngle = segAngle * (0.15 + this.seededRandom(pSeed) * 0.7);
-                const pDist = radius * (0.18 + p * 0.17 + this.seededRandom(pSeed + 8) * 0.06) * orbitFactor;
-                // Gravitational slingshot: bass pushes orbits out
-                const slingshot = energy * radius * 0.04 * orbitFactor;
-                const px = Math.cos(pAngle) * (pDist + slingshot);
-                const py = Math.sin(pAngle) * (pDist + slingshot);
-                const bodySize = radius * (0.03 + this.seededRandom(pSeed + 1) * 0.035) * orbitFactor;
-                const bodyHue = (brassHue + this.seededRandom(pSeed + 2) * 70 - 10) % 360;
-                // Each body spins independently
-                const selfSpin = rot * (0.3 + this.seededRandom(pSeed + 3) * 1.8) * (this.seededRandom(pSeed + 4) > 0.5 ? 1 : -1);
+            // --- Phosphor trail behind body (recent path glows) ---
+            ctx.beginPath();
+            const trailLength = 0.6; // radians of trail
+            const trailSteps = 15;
+            for (let ts = 0; ts <= trailSteps; ts++) {
+                const ta = currentAngle - trailLength * (ts / trailSteps);
+                const tR = orbitRadiusBase * (1 - eccentricity * Math.cos((orbitalAngle - trailLength * (ts / trailSteps)) * 2)) + slingshot;
+                const tx = Math.cos(ta) * tR;
+                const ty = Math.sin(ta) * tR;
+                ts === 0 ? ctx.moveTo(tx, ty) : ctx.lineTo(tx, ty);
+            }
+            ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 55%, ${0.08 + brightness * 0.06})`;
+            ctx.lineWidth = bodySize * 0.4;
+            ctx.lineCap = 'round';
+            ctx.stroke();
 
-                ctx.save();
-                ctx.translate(px, py);
-                ctx.rotate(selfSpin);
+            // --- Brass armature from hub to body ---
+            const armAlpha = 0.25 + harmonic * 0.2;
+            // Jointed arm: hub → joint → body
+            const jointT = 0.4 + this.seededRandom(pSeed + 20) * 0.2;
+            const jx = px * jointT;
+            const jy = py * jointT;
+            // Segment 1: hub to joint
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(jx, jy);
+            ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.5}%, ${38 + harmonic * 15}%, ${armAlpha})`;
+            ctx.lineWidth = thickness * 0.4;
+            ctx.stroke();
+            // Segment 2: joint to body (slight offset for mechanical look)
+            ctx.beginPath();
+            ctx.moveTo(jx, jy);
+            ctx.lineTo(px, py);
+            ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, ${35 + harmonic * 12}%, ${armAlpha * 0.9})`;
+            ctx.lineWidth = thickness * 0.3;
+            ctx.stroke();
+            // Joint rivet
+            ctx.beginPath();
+            ctx.arc(jx, jy, 1.5 + energy * 0.8, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.5}%, 60%, ${0.4 + harmonic * 0.3})`;
+            ctx.fill();
 
-                if (bodyType === 0) {
-                    // --- ARMILLARY: tilted concentric rings ---
-                    const ringCount = 2 + Math.floor(this.seededRandom(pSeed + 10) * 2);
-                    for (let r = 0; r < ringCount; r++) {
-                        const ringR = bodySize * (0.7 + r * 0.35);
-                        const tilt = r * 1.1 + this.seededRandom(pSeed + r + 20) * 0.8;
-                        ctx.save();
-                        ctx.rotate(tilt);
-                        ctx.scale(1, 0.35 + r * 0.12);
-                        ctx.beginPath();
-                        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
-                        ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.6}%, ${50 + brightness * 20}%, ${0.4 + energy * 0.3})`;
-                        ctx.lineWidth = thickness * 0.3;
-                        ctx.stroke();
-                        ctx.restore();
-                    }
-                    // Core dot
-                    ctx.beginPath();
-                    ctx.arc(0, 0, bodySize * 0.25, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.5}%, 80%, 0.8)`;
-                    ctx.fill();
+            // --- Body rendering (self-rotating) ---
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(selfSpin);
 
-                } else if (bodyType === 1) {
-                    // --- RINGED PLANET (Saturn-like): body + angled ring ---
-                    ctx.beginPath();
-                    ctx.arc(0, 0, bodySize * 0.45, 0, Math.PI * 2);
-                    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, bodySize * 0.45);
-                    grad.addColorStop(0, `hsla(${bodyHue}, ${sat * 0.5}%, 70%, 0.9)`);
-                    grad.addColorStop(1, `hsla(${bodyHue}, ${sat * 0.6}%, 40%, 0.6)`);
-                    ctx.fillStyle = grad;
-                    ctx.fill();
-                    // Ring
+            if (bodyType === 0) {
+                // ARMILLARY: tilted concentric rings
+                const ringCount = 2 + Math.floor(this.seededRandom(pSeed + 10) * 2);
+                for (let r = 0; r < ringCount; r++) {
+                    const ringR = bodySize * (0.7 + r * 0.35);
+                    const tilt = r * 1.1 + this.seededRandom(pSeed + r + 20) * 0.8;
                     ctx.save();
-                    ctx.scale(1, 0.3);
+                    ctx.rotate(tilt);
+                    ctx.scale(1, 0.35 + r * 0.12);
                     ctx.beginPath();
-                    ctx.arc(0, 0, bodySize * 1.1, 0, Math.PI * 2);
-                    ctx.strokeStyle = `hsla(${(bodyHue + 20) % 360}, ${sat * 0.5}%, 60%, ${0.5 + energy * 0.3})`;
-                    ctx.lineWidth = bodySize * 0.12;
+                    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+                    ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.6}%, ${50 + brightness * 20}%, ${0.4 + energy * 0.3})`;
+                    ctx.lineWidth = thickness * 0.3;
                     ctx.stroke();
                     ctx.restore();
+                }
+                ctx.beginPath();
+                ctx.arc(0, 0, bodySize * 0.25, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.5}%, 80%, 0.8)`;
+                ctx.fill();
 
-                } else if (bodyType === 2) {
-                    // --- CRESCENT MOON: two overlapping circles ---
-                    ctx.beginPath();
-                    ctx.arc(0, 0, bodySize * 0.5, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 65%, ${0.5 + brightness * 0.3})`;
-                    ctx.fill();
-                    // Dark bite
-                    ctx.beginPath();
-                    ctx.arc(bodySize * 0.2, -bodySize * 0.1, bodySize * 0.42, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(0, 0%, 5%, 0.7)`;
-                    ctx.fill();
+            } else if (bodyType === 1) {
+                // RINGED PLANET (Saturn-like)
+                ctx.beginPath();
+                ctx.arc(0, 0, bodySize * 0.45, 0, Math.PI * 2);
+                const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, bodySize * 0.45);
+                grad.addColorStop(0, `hsla(${bodyHue}, ${sat * 0.5}%, 70%, 0.9)`);
+                grad.addColorStop(1, `hsla(${bodyHue}, ${sat * 0.6}%, 40%, 0.6)`);
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.save();
+                ctx.scale(1, 0.3);
+                ctx.beginPath();
+                ctx.arc(0, 0, bodySize * 1.1, 0, Math.PI * 2);
+                ctx.strokeStyle = `hsla(${(bodyHue + 20) % 360}, ${sat * 0.5}%, 60%, ${0.5 + energy * 0.3})`;
+                ctx.lineWidth = bodySize * 0.12;
+                ctx.stroke();
+                ctx.restore();
 
-                } else if (bodyType === 3) {
-                    // --- GEAR COG: toothed wheel, self-rotating ---
-                    const teeth = 6 + Math.floor(this.seededRandom(pSeed + 15) * 6);
-                    const innerR = bodySize * 0.5;
-                    const outerR = bodySize * 0.75;
+            } else if (bodyType === 2) {
+                // CRESCENT MOON
+                ctx.beginPath();
+                ctx.arc(0, 0, bodySize * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 65%, ${0.5 + brightness * 0.3})`;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(bodySize * 0.2, -bodySize * 0.1, bodySize * 0.42, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(0, 0%, 5%, 0.7)`;
+                ctx.fill();
+
+            } else if (bodyType === 3) {
+                // GEAR COG
+                const teeth = 6 + Math.floor(this.seededRandom(pSeed + 15) * 6);
+                const innerR = bodySize * 0.5;
+                const outerR = bodySize * 0.75;
+                ctx.beginPath();
+                for (let t = 0; t <= teeth; t++) {
+                    const a = (Math.PI * 2 * t) / teeth;
+                    const r1 = (t % 2 === 0) ? outerR : innerR;
+                    ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.6}%, ${50 + energy * 20}%, ${0.5 + harmonic * 0.3})`;
+                ctx.lineWidth = thickness * 0.35;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, 0, bodySize * 0.15, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.4}%, 60%, 0.7)`;
+                ctx.fill();
+                for (let sp = 0; sp < 3; sp++) {
+                    const spA = (Math.PI * 2 * sp) / 3;
                     ctx.beginPath();
-                    for (let t = 0; t <= teeth; t++) {
-                        const a = (Math.PI * 2 * t) / teeth;
-                        const r1 = (t % 2 === 0) ? outerR : innerR;
-                        const x = Math.cos(a) * r1;
-                        const y = Math.sin(a) * r1;
-                        t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                    ctx.moveTo(Math.cos(spA) * bodySize * 0.15, Math.sin(spA) * bodySize * 0.15);
+                    ctx.lineTo(Math.cos(spA) * innerR * 0.9, Math.sin(spA) * innerR * 0.9);
+                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, 50%, 0.4)`;
+                    ctx.lineWidth = thickness * 0.25;
+                    ctx.stroke();
+                }
+
+            } else if (bodyType === 4) {
+                // ASTEROID CLUSTER
+                const rockCount = 4 + Math.floor(this.seededRandom(pSeed + 20) * 4);
+                for (let rk = 0; rk < rockCount; rk++) {
+                    const rkSeed = pSeed + 200 + rk * 7;
+                    const rkDist = this.seededRandom(rkSeed) * bodySize * 0.7;
+                    const rkAngle = this.seededRandom(rkSeed + 1) * Math.PI * 2;
+                    const rkSize = bodySize * (0.08 + this.seededRandom(rkSeed + 2) * 0.15);
+                    const rkX = Math.cos(rkAngle) * rkDist;
+                    const rkY = Math.sin(rkAngle) * rkDist;
+                    const rkSides = 4 + Math.floor(this.seededRandom(rkSeed + 3) * 3);
+                    ctx.beginPath();
+                    for (let v = 0; v < rkSides; v++) {
+                        const va = (Math.PI * 2 * v) / rkSides;
+                        const vr = rkSize * (0.6 + this.seededRandom(rkSeed + 10 + v) * 0.5);
+                        ctx.lineTo(rkX + Math.cos(va) * vr, rkY + Math.sin(va) * vr);
                     }
                     ctx.closePath();
-                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.6}%, ${50 + energy * 20}%, ${0.5 + harmonic * 0.3})`;
-                    ctx.lineWidth = thickness * 0.35;
+                    ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.3}%, ${30 + brightness * 15}%, ${0.4 + energy * 0.2})`;
+                    ctx.fill();
+                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, ${45 + brightness * 15}%, ${0.3 + energy * 0.2})`;
+                    ctx.lineWidth = 0.5;
                     ctx.stroke();
-                    // Axle
-                    ctx.beginPath();
-                    ctx.arc(0, 0, bodySize * 0.15, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.4}%, 60%, 0.7)`;
-                    ctx.fill();
-                    // Spokes
-                    for (let sp = 0; sp < 3; sp++) {
-                        const spA = (Math.PI * 2 * sp) / 3;
-                        ctx.beginPath();
-                        ctx.moveTo(Math.cos(spA) * bodySize * 0.15, Math.sin(spA) * bodySize * 0.15);
-                        ctx.lineTo(Math.cos(spA) * innerR * 0.9, Math.sin(spA) * innerR * 0.9);
-                        ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, 50%, 0.4)`;
-                        ctx.lineWidth = thickness * 0.25;
-                        ctx.stroke();
-                    }
-
-                } else if (bodyType === 4) {
-                    // --- ASTEROID CLUSTER: scattered irregular rocks ---
-                    const rockCount = 4 + Math.floor(this.seededRandom(pSeed + 20) * 4);
-                    for (let rk = 0; rk < rockCount; rk++) {
-                        const rkSeed = pSeed + 200 + rk * 7;
-                        const rkDist = this.seededRandom(rkSeed) * bodySize * 0.7;
-                        const rkAngle = this.seededRandom(rkSeed + 1) * Math.PI * 2;
-                        const rkSize = bodySize * (0.08 + this.seededRandom(rkSeed + 2) * 0.15);
-                        const rkX = Math.cos(rkAngle) * rkDist;
-                        const rkY = Math.sin(rkAngle) * rkDist;
-                        // Irregular polygon
-                        const rkSides = 4 + Math.floor(this.seededRandom(rkSeed + 3) * 3);
-                        ctx.beginPath();
-                        for (let v = 0; v < rkSides; v++) {
-                            const va = (Math.PI * 2 * v) / rkSides;
-                            const vr = rkSize * (0.6 + this.seededRandom(rkSeed + 10 + v) * 0.5);
-                            const vx = rkX + Math.cos(va) * vr;
-                            const vy = rkY + Math.sin(va) * vr;
-                            v === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy);
-                        }
-                        ctx.closePath();
-                        ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.3}%, ${30 + brightness * 15}%, ${0.4 + energy * 0.2})`;
-                        ctx.fill();
-                        ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, ${45 + brightness * 15}%, ${0.3 + energy * 0.2})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.stroke();
-                    }
-
-                } else {
-                    // --- COMET: bright head with trailing bezier tail ---
-                    // Head
-                    const headGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bodySize * 0.4);
-                    headGrad.addColorStop(0, `hsla(${(bodyHue + 40) % 360}, ${sat * 0.7}%, 85%, 0.9)`);
-                    headGrad.addColorStop(1, `hsla(${(bodyHue + 40) % 360}, ${sat * 0.5}%, 50%, 0)`);
-                    ctx.beginPath();
-                    ctx.arc(0, 0, bodySize * 0.4, 0, Math.PI * 2);
-                    ctx.fillStyle = headGrad;
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(0, 0, bodySize * 0.15, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(0, 0%, 95%, 0.9)`;
-                    ctx.fill();
-                    // Tail (two curves fanning outward)
-                    const tailLen = bodySize * (2 + energy * 1.5);
-                    for (let t = 0; t < 2; t++) {
-                        const spread = (t - 0.5) * bodySize * 0.4;
-                        ctx.beginPath();
-                        ctx.moveTo(0, 0);
-                        ctx.quadraticCurveTo(-tailLen * 0.4, spread * 2, -tailLen, spread * 3);
-                        ctx.strokeStyle = `hsla(${(bodyHue + 40) % 360}, ${sat * 0.6}%, 65%, ${0.2 + energy * 0.15})`;
-                        ctx.lineWidth = bodySize * (0.06 - t * 0.02);
-                        ctx.stroke();
-                    }
                 }
 
-                // Orbit glow trail (faded arc behind each body)
-                ctx.restore(); // back to mirror coords
+            } else {
+                // COMET
+                const headGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bodySize * 0.4);
+                headGrad.addColorStop(0, `hsla(${(bodyHue + 40) % 360}, ${sat * 0.7}%, 85%, 0.9)`);
+                headGrad.addColorStop(1, `hsla(${(bodyHue + 40) % 360}, ${sat * 0.5}%, 50%, 0)`);
                 ctx.beginPath();
-                const trailStart = pAngle - 0.4;
-                const trailEnd = pAngle;
-                ctx.arc(0, 0, pDist + slingshot, trailStart, trailEnd);
-                ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.3}%, 50%, ${0.06 + brightness * 0.06})`;
-                ctx.lineWidth = bodySize * 0.4;
-                ctx.lineCap = 'round';
-                ctx.stroke();
-
-                // Epicycle moons (only for non-cluster, non-comet types)
-                if (bodyType < 4) {
-                    const moonCount = Math.floor(this.seededRandom(pSeed + 5) * 2);
-                    for (let mn = 0; mn < moonCount; mn++) {
-                        const moonSeed = pSeed + 100 + mn * 11;
-                        const moonOrbit = bodySize * (1.3 + mn * 0.7);
-                        const moonAngle = rot * (2 + this.seededRandom(moonSeed) * 2) + this.seededRandom(moonSeed + 1) * Math.PI * 2;
-                        const moX = px + Math.cos(moonAngle) * moonOrbit;
-                        const moY = py + Math.sin(moonAngle) * moonOrbit;
-                        const moonSize = bodySize * 0.15;
-
-                        // Moon orbit ring
-                        ctx.beginPath();
-                        ctx.arc(px, py, moonOrbit, 0, Math.PI * 2);
-                        ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.25}%, 42%, ${0.07 + harmonic * 0.07})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.stroke();
-
-                        // Moon dot
-                        ctx.beginPath();
-                        ctx.arc(moX, moY, moonSize, 0, Math.PI * 2);
-                        ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 70%, ${0.5 + energy * 0.3})`;
-                        ctx.fill();
-                    }
-                }
-            }
-
-            // --- Lagrange shimmer dust cloud ---
-            const lgAngle = segAngle * 0.5;
-            const lgDist = radius * (0.4 + this.seededRandom(seed + m * 3 + 700) * 0.15) * orbitFactor;
-            const lgx = Math.cos(lgAngle) * lgDist;
-            const lgy = Math.sin(lgAngle) * lgDist;
-            const shimmerSize = radius * 0.05 * (0.5 + harmonic * 0.5);
-            const shimmerAlpha = 0.06 + brightness * 0.1;
-
-            // Scatter particles instead of solid glow
-            const dustN = 6 + Math.floor(brightness * 4);
-            for (let d = 0; d < dustN; d++) {
-                const dS = seed + 800 + m * 20 + d * 7;
-                const dx = lgx + (this.seededRandom(dS) - 0.5) * shimmerSize * 2;
-                const dy = lgy + (this.seededRandom(dS + 1) - 0.5) * shimmerSize * 2;
-                const dSize = 0.5 + this.seededRandom(dS + 2) * 1.5;
-                const twinkle = 0.5 + Math.sin(rot * 3 + this.seededRandom(dS + 3) * 6) * 0.5;
-                ctx.beginPath();
-                ctx.arc(dx, dy, dSize, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${(brassHue + 55) % 360}, ${sat * 0.5}%, 70%, ${shimmerAlpha * twinkle})`;
+                ctx.arc(0, 0, bodySize * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = headGrad;
                 ctx.fill();
+                ctx.beginPath();
+                ctx.arc(0, 0, bodySize * 0.15, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(0, 0%, 95%, 0.9)`;
+                ctx.fill();
+                const tailLen = bodySize * (2 + energy * 1.5);
+                for (let t = 0; t < 2; t++) {
+                    const spread = (t - 0.5) * bodySize * 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.quadraticCurveTo(-tailLen * 0.4, spread * 2, -tailLen, spread * 3);
+                    ctx.strokeStyle = `hsla(${(bodyHue + 40) % 360}, ${sat * 0.6}%, 65%, ${0.2 + energy * 0.15})`;
+                    ctx.lineWidth = bodySize * (0.06 - t * 0.02);
+                    ctx.stroke();
+                }
             }
 
-            ctx.restore();
+            ctx.restore(); // end body self-rotation
+
+            // --- Epicycle moons orbiting this body ---
+            if (bodyType < 4) {
+                const moonCount = 1 + Math.floor(this.seededRandom(pSeed + 5) * 2);
+                for (let mn = 0; mn < moonCount; mn++) {
+                    const moonSeed = pSeed + 100 + mn * 11;
+                    const moonOrbit = bodySize * (1.4 + mn * 0.8);
+                    // Moons orbit their planet (not the center)
+                    const moonSpeed = 2 + this.seededRandom(moonSeed) * 3;
+                    const moonDir = this.seededRandom(moonSeed + 2) > 0.3 ? 1 : -1;
+                    const moonAngle = rot * moonSpeed * moonDir + this.seededRandom(moonSeed + 1) * Math.PI * 2;
+                    const moonEcc = this.seededRandom(moonSeed + 3) * 0.2;
+                    const moonR = moonOrbit * (1 - moonEcc * Math.cos(moonAngle));
+                    const moX = px + Math.cos(moonAngle) * moonR;
+                    const moY = py + Math.sin(moonAngle) * moonR;
+                    const moonSize = bodySize * (0.12 + this.seededRandom(moonSeed + 4) * 0.08);
+
+                    // Moon orbit ring
+                    ctx.beginPath();
+                    ctx.arc(px, py, moonOrbit, 0, Math.PI * 2);
+                    ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.2}%, 40%, ${0.05 + harmonic * 0.06})`;
+                    ctx.lineWidth = 0.4;
+                    ctx.stroke();
+
+                    // Tiny armature from planet to moon
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(moX, moY);
+                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.35}%, 45%, ${0.12 + harmonic * 0.1})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+
+                    // Moon body
+                    ctx.beginPath();
+                    ctx.arc(moX, moY, moonSize, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 70%, ${0.5 + energy * 0.3})`;
+                    ctx.fill();
+
+                    // Sub-moon (epicycle of epicycle) for some moons
+                    if (this.seededRandom(moonSeed + 5) > 0.5) {
+                        const subOrbit = moonSize * 3;
+                        const subAngle = rot * (moonSpeed * 2.5) * -moonDir + this.seededRandom(moonSeed + 6) * Math.PI * 2;
+                        const subX = moX + Math.cos(subAngle) * subOrbit;
+                        const subY = moY + Math.sin(subAngle) * subOrbit;
+                        ctx.beginPath();
+                        ctx.moveTo(moX, moY);
+                        ctx.lineTo(subX, subY);
+                        ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.3}%, 42%, ${0.08 + harmonic * 0.06})`;
+                        ctx.lineWidth = 0.3;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.arc(subX, subY, moonSize * 0.5, 0, Math.PI * 2);
+                        ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.35}%, 65%, ${0.4 + energy * 0.2})`;
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // --- Harmonic resonance strings between bodies on beats ---
+        if (harmonic > 0.3) {
+            const resAlpha = (harmonic - 0.3) * 0.25;
+            for (let i = 0; i < bodyCount; i++) {
+                const iSeed = seed + i * 37;
+                const iRadBase = radius * (0.15 + i * 0.13 + this.seededRandom(iSeed + 8) * 0.04) * orbitFactor;
+                const iEcc = 0.05 + this.seededRandom(iSeed + 9) * 0.25;
+                const iSpeed = 0.8 / Math.pow((0.15 + i * 0.13), 1.1);
+                const iDir = this.seededRandom(iSeed + 10) > 0.15 ? 1 : -1;
+                const iPhase = this.seededRandom(iSeed + 13) * Math.PI * 2;
+                const iAngle = rot * iSpeed * iDir + iPhase + Math.sin(rot * (0.1 + this.seededRandom(iSeed + 12) * 0.15) + i * 2) * (0.03 + this.seededRandom(iSeed + 11) * 0.06);
+                const iR = iRadBase * (1 - iEcc * Math.cos((rot * iSpeed * iDir + iPhase) * 2)) + energy * radius * 0.04 * orbitFactor;
+                const ix = Math.cos(iAngle) * iR;
+                const iy = Math.sin(iAngle) * iR;
+
+                for (let j = i + 1; j < bodyCount; j++) {
+                    if (this.seededRandom(seed + i * 10 + j) > 0.5) continue;
+                    const jSeed = seed + j * 37;
+                    const jRadBase = radius * (0.15 + j * 0.13 + this.seededRandom(jSeed + 8) * 0.04) * orbitFactor;
+                    const jEcc = 0.05 + this.seededRandom(jSeed + 9) * 0.25;
+                    const jSpeed = 0.8 / Math.pow((0.15 + j * 0.13), 1.1);
+                    const jDir = this.seededRandom(jSeed + 10) > 0.15 ? 1 : -1;
+                    const jPhase = this.seededRandom(jSeed + 13) * Math.PI * 2;
+                    const jAngle = rot * jSpeed * jDir + jPhase + Math.sin(rot * (0.1 + this.seededRandom(jSeed + 12) * 0.15) + j * 2) * (0.03 + this.seededRandom(jSeed + 11) * 0.06);
+                    const jR = jRadBase * (1 - jEcc * Math.cos((rot * jSpeed * jDir + jPhase) * 2)) + energy * radius * 0.04 * orbitFactor;
+                    const jx = Math.cos(jAngle) * jR;
+                    const jy = Math.sin(jAngle) * jR;
+
+                    ctx.beginPath();
+                    ctx.moveTo(ix, iy);
+                    const cpx = (ix + jx) / 2 + Math.sin(rot * 2 + i + j) * radius * 0.03;
+                    const cpy = (iy + jy) / 2 + Math.cos(rot * 2.5 + i - j) * radius * 0.03;
+                    ctx.quadraticCurveTo(cpx, cpy, jx, jy);
+                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.6}%, 60%, ${resAlpha * (0.5 + energy * 0.5)})`;
+                    ctx.lineWidth = 0.5 + energy * 0.8;
+                    ctx.stroke();
+                }
+            }
         }
 
         // === THE TICKING HAND — gear-shift motion (snaps to discrete positions) ===
