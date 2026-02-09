@@ -1951,8 +1951,8 @@ class KaleidoscopeStudio {
         const accentHsl = this.hexToHsl(config.accentColor);
         const bgHue = accentHsl.h;
         const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
-        const amberHue = 35;
-        const crimsonHue = 350;
+        const amberHue = bgHue;
+        const crimsonHue = (bgHue - 45 + 360) % 360;
 
         // --- FAR LAYER (0.15x): Scattered large faint sigils ---
         ctx.save();
@@ -2051,8 +2051,8 @@ class KaleidoscopeStudio {
         const accentHsl = this.hexToHsl(config.accentColor);
         const bgHue = accentHsl.h;
         const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
-        const cyanHue = 180;
-        const amethystHue = 275;
+        const cyanHue = bgHue;
+        const amethystHue = (bgHue + 95) % 360;
 
         // --- FAR LAYER (0.15x): Ghostly mushroom silhouettes ---
         ctx.save();
@@ -3970,10 +3970,10 @@ class KaleidoscopeStudio {
         const hueShift = this.seededRandom(seed + 2) * 40;
         const density = 4 + Math.floor(this.seededRandom(seed + 1) * 4);
 
-        // Archaic palette: amber, crimson, bone-white, blackened gold
-        const amberHue = 35;
-        const crimsonHue = 350;
-        const boneHue = 45;
+        // Archaic palette: user hue as base, offsets for secondary/tertiary
+        const amberHue = hue;
+        const crimsonHue = (hue - 45 + 360) % 360;
+        const boneHue = (hue + 10) % 360;
 
         // --- Kaleidoscope mirrored symbol rings ---
         for (let m = 0; m < mirrors; m++) {
@@ -4344,10 +4344,10 @@ class KaleidoscopeStudio {
         const hueShift = this.seededRandom(seed + 2) * 40;
         const clusterDensity = 2 + Math.floor(this.seededRandom(seed + 1) * 2);
 
-        // Bioluminescent palette
-        const cyanHue = 180;
-        const amethystHue = 275;
-        const forestHue = 120;
+        // Bioluminescent palette: user hue as base, offsets for secondary/tertiary
+        const cyanHue = hue;
+        const amethystHue = (hue + 95) % 360;
+        const forestHue = (hue - 60 + 360) % 360;
 
         // Breathing pulse
         const breathe = (phase) => 1 + Math.sin(rot * 2 + phase) * 0.2 * (0.5 + harmonic * 0.5);
