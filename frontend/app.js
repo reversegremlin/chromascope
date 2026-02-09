@@ -2044,136 +2044,96 @@ class KaleidoscopeStudio {
     renderMycelialBackground(ctx, width, height, centerX, centerY, reactivity) {
         const config = this.config;
         const energy = this.smoothedValues.percussiveImpact;
-        const harmonic = this.smoothedValues.harmonicEnergy;
-        const brightness = this.smoothedValues.spectralBrightness;
         const maxDim = Math.max(width, height) * 0.75;
         const rot = this._bgFractalRotation;
         const accentHsl = this.hexToHsl(config.accentColor);
         const bgHue = accentHsl.h;
         const baseAlpha = 0.06 + reactivity * 0.10 + energy * reactivity * 0.08;
-        const cyanHue = bgHue;
-        const amethystHue = (bgHue + 95) % 360;
 
-        // --- FAR LAYER (0.15x): Ghostly mushroom silhouettes ---
+        // --- FAR LAYER (0.15x): Ghostly Vein Network ---
         ctx.save();
         ctx.translate(centerX, centerY);
         ctx.rotate(rot * 0.15);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 12; i++) {
             const seed = i * 37 + 47;
-            const dist = maxDim * (0.25 + this.seededRandom(seed) * 0.7);
-            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
-            const mushHue = (amethystHue + this.seededRandom(seed + 2) * 40 - 20) % 360;
-            const capW = maxDim * (0.03 + this.seededRandom(seed + 3) * 0.04);
-            const capH = capW * (0.4 + this.seededRandom(seed + 4) * 0.2);
-            const stipeH = capW * (0.8 + this.seededRandom(seed + 5) * 0.6);
-            const mx = Math.cos(angle) * dist;
-            const my = Math.sin(angle) * dist;
-            const alpha = baseAlpha * (0.4 + this.seededRandom(seed + 6) * 0.3);
+            const startDist = maxDim * (0.05 + this.seededRandom(seed) * 0.3);
+            const startAngle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const endDist = maxDim * (0.4 + this.seededRandom(seed + 2) * 0.5);
+            const endAngle = startAngle + (this.seededRandom(seed + 3) - 0.5) * 1.5;
+            const veinHue = (bgHue + this.seededRandom(seed + 4) * 40 - 20) % 360;
 
-            ctx.save();
-            ctx.translate(mx, my);
+            const x1 = Math.cos(startAngle) * startDist;
+            const y1 = Math.sin(startAngle) * startDist;
+            const x2 = Math.cos(endAngle) * endDist;
+            const y2 = Math.sin(endAngle) * endDist;
+            // Wobble control point gently with rotation
+            const wobble = Math.sin(rot * 0.5 + this.seededRandom(seed + 7) * Math.PI * 2) * maxDim * 0.02;
+            const cpx = (x1 + x2) / 2 + (this.seededRandom(seed + 5) - 0.5) * maxDim * 0.3 + wobble;
+            const cpy = (y1 + y2) / 2 + (this.seededRandom(seed + 6) - 0.5) * maxDim * 0.3 + wobble;
 
-            // Stipe (stem)
             ctx.beginPath();
-            ctx.moveTo(-capW * 0.08, 0);
-            ctx.quadraticCurveTo(-capW * 0.12, stipeH * 0.5, -capW * 0.06, stipeH);
-            ctx.lineTo(capW * 0.06, stipeH);
-            ctx.quadraticCurveTo(capW * 0.12, stipeH * 0.5, capW * 0.08, 0);
-            ctx.fillStyle = `hsla(${mushHue}, ${config.saturation * 0.25}%, 40%, ${alpha})`;
-            ctx.fill();
-
-            // Cap (dome)
-            ctx.beginPath();
-            ctx.ellipse(0, 0, capW, capH, 0, Math.PI, 0);
-            ctx.fillStyle = `hsla(${mushHue}, ${config.saturation * 0.35}%, 35%, ${alpha * 1.2})`;
-            ctx.fill();
-
-            ctx.restore();
+            ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(cpx, cpy, x2, y2);
+            ctx.strokeStyle = `hsla(${veinHue}, ${config.saturation * 0.3}%, 40%, ${baseAlpha * (0.5 + this.seededRandom(seed + 8) * 0.5)})`;
+            ctx.lineWidth = 0.5 + this.seededRandom(seed + 9) * 0.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
         }
         ctx.restore();
 
-        // --- MID LAYER (-0.5x, counter-rotate): Drifting spore haze ---
+        // --- MID LAYER (-0.5x): Floating Nutrient Particles ---
         ctx.save();
         ctx.translate(centerX, centerY);
         ctx.rotate(-rot * 0.5);
 
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 18; i++) {
             const seed = i * 13 + 113;
-            const dist = maxDim * (0.05 + this.seededRandom(seed) * 1.0);
-            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
-            const drift = Math.sin(rot * 1.2 + this.seededRandom(seed + 2) * Math.PI * 2) * maxDim * 0.03;
-            const sporeSize = maxDim * (0.002 + this.seededRandom(seed + 3) * 0.005);
-            const sporeHue = (amethystHue + this.seededRandom(seed + 4) * 60 - 30) % 360;
-            const phase = this.seededRandom(seed + 5) * Math.PI * 2;
-            const pulse = 0.5 + Math.sin(rot * 2 + phase) * 0.5;
+            const orbitR = maxDim * (0.1 + this.seededRandom(seed) * 0.8);
+            const baseAngle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const speed = 0.3 + this.seededRandom(seed + 2) * 0.4;
+            const angle = baseAngle + rot * speed * 0.1;
+            const particleHue = (bgHue + 95 + this.seededRandom(seed + 3) * 40) % 360;
+            const size = maxDim * (0.002 + this.seededRandom(seed + 4) * 0.003);
 
-            const sx = Math.cos(angle) * (dist + drift);
-            const sy = Math.sin(angle) * (dist + drift);
+            const px = Math.cos(angle) * orbitR;
+            const py = Math.sin(angle) * orbitR;
+            const alpha = baseAlpha * (0.3 + reactivity * 0.6);
 
-            // Tiny drifting spore with subtle glow
-            const spGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sporeSize * 3);
-            spGrad.addColorStop(0, `hsla(${sporeHue}, ${config.saturation * 0.5}%, 65%, ${baseAlpha * 0.5 * pulse})`);
-            spGrad.addColorStop(1, `hsla(${sporeHue}, ${config.saturation * 0.3}%, 50%, 0)`);
+            const pGrad = ctx.createRadialGradient(px, py, 0, px, py, size * 3);
+            pGrad.addColorStop(0, `hsla(${particleHue}, ${config.saturation * 0.5}%, 60%, ${alpha})`);
+            pGrad.addColorStop(1, `hsla(${particleHue}, ${config.saturation * 0.3}%, 45%, 0)`);
             ctx.beginPath();
-            ctx.arc(sx, sy, sporeSize * 3, 0, Math.PI * 2);
-            ctx.fillStyle = spGrad;
+            ctx.arc(px, py, size * 3, 0, Math.PI * 2);
+            ctx.fillStyle = pGrad;
             ctx.fill();
         }
         ctx.restore();
 
-        // --- NEAR LAYER (0.9x): Fairy-ring mushroom clusters with glow ---
+        // --- NEAR LAYER (1.0x): Bright Growth Nodes ---
         ctx.save();
         ctx.translate(centerX, centerY);
-        ctx.rotate(rot * 0.9);
+        ctx.rotate(rot * 1.0);
 
         for (let i = 0; i < 8; i++) {
             const seed = i * 29 + 227;
-            const ringDist = maxDim * (0.2 + this.seededRandom(seed) * 0.7);
-            const ringAngle = this.seededRandom(seed + 1) * Math.PI * 2;
+            const dist = maxDim * (0.15 + this.seededRandom(seed) * 0.7);
+            const angle = this.seededRandom(seed + 1) * Math.PI * 2;
             const phase = this.seededRandom(seed + 2) * Math.PI * 2;
             const pulse = 0.5 + Math.sin(rot * 3 + phase) * 0.5;
-            const clusterHue = (cyanHue + this.seededRandom(seed + 3) * 50) % 360;
-            const rx = Math.cos(ringAngle) * ringDist;
-            const ry = Math.sin(ringAngle) * ringDist;
+            const nodeHue = (bgHue + this.seededRandom(seed + 3) * 60) % 360;
+            const nx = Math.cos(angle) * dist;
+            const ny = Math.sin(angle) * dist;
+            const nodeSize = maxDim * (0.003 + this.seededRandom(seed + 4) * 0.005) * (0.7 + pulse * 0.5);
+            const alpha = baseAlpha * (0.6 + reactivity * 1.0) * pulse;
 
-            // Bioluminescent ground glow
-            const glowR = maxDim * 0.04 * (0.7 + pulse * 0.5 + energy * reactivity * 0.3);
-            const glow = ctx.createRadialGradient(rx, ry, 0, rx, ry, glowR);
-            glow.addColorStop(0, `hsla(${clusterHue}, ${config.saturation * 0.6}%, 55%, ${baseAlpha * 0.8 * pulse})`);
-            glow.addColorStop(1, `hsla(${clusterHue}, ${config.saturation * 0.4}%, 40%, 0)`);
+            const nGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nodeSize * 3);
+            nGrad.addColorStop(0, `hsla(${nodeHue}, ${config.saturation * 0.6}%, 65%, ${alpha})`);
+            nGrad.addColorStop(1, `hsla(${nodeHue}, ${config.saturation * 0.4}%, 45%, 0)`);
             ctx.beginPath();
-            ctx.arc(rx, ry, glowR, 0, Math.PI * 2);
-            ctx.fillStyle = glow;
+            ctx.arc(nx, ny, nodeSize * 3, 0, Math.PI * 2);
+            ctx.fillStyle = nGrad;
             ctx.fill();
-
-            // Small mushroom cluster (3-5 tiny fungi)
-            const clusterN = 3 + Math.floor(this.seededRandom(seed + 4) * 3);
-            for (let c = 0; c < clusterN; c++) {
-                const cSeed = seed + 10 + c;
-                const cOff = (this.seededRandom(cSeed) - 0.5) * glowR * 0.7;
-                const cOff2 = (this.seededRandom(cSeed + 1) - 0.5) * glowR * 0.5;
-                const mcx = rx + cOff;
-                const mcy = ry + cOff2;
-                const mCapW = maxDim * 0.005 * (0.6 + this.seededRandom(cSeed + 2) * 0.8 + pulse * 0.3);
-                const mCapH = mCapW * 0.5;
-                const mStipeH = mCapW * 1.2;
-
-                // Tiny stipe
-                ctx.beginPath();
-                ctx.moveTo(mcx, mcy);
-                ctx.lineTo(mcx, mcy + mStipeH);
-                ctx.strokeStyle = `hsla(${clusterHue}, ${config.saturation * 0.4}%, 50%, ${baseAlpha * 0.7})`;
-                ctx.lineWidth = mCapW * 0.15;
-                ctx.lineCap = 'round';
-                ctx.stroke();
-
-                // Tiny cap
-                ctx.beginPath();
-                ctx.ellipse(mcx, mcy, mCapW, mCapH, 0, Math.PI, 0);
-                ctx.fillStyle = `hsla(${(clusterHue + 20) % 360}, ${config.saturation * 0.5}%, 55%, ${baseAlpha * (0.6 + pulse * 0.3)})`;
-                ctx.fill();
-            }
         }
         ctx.restore();
     }
@@ -4341,20 +4301,24 @@ class KaleidoscopeStudio {
         const rot = this.accumulatedRotation;
         const orbitFactor = config.orbitRadius / 200;
 
-        // Seed-based variation
         const rotDir = this.seededRandom(seed) > 0.5 ? 1 : -1;
         const hueShift = this.seededRandom(seed + 2) * 40;
-        const clusterDensity = Math.max(2, Math.floor(numSides / 3)) + Math.floor(this.seededRandom(seed + 1) * 2);
 
-        // Bioluminescent palette: user hue as base, offsets for secondary/tertiary
-        const cyanHue = hue;
-        const amethystHue = (hue + 95) % 360;
-        const forestHue = (hue - 60 + 360) % 360;
+        // Organic palette
+        const baseHue = hue;
+        const tipHue = (hue + 120) % 360;
+        const nodeHue = (hue + 260) % 360;
+        const pulseHue = (hue + 30) % 360;
 
-        // Breathing pulse
-        const breathe = (phase) => 1 + Math.sin(rot * 2 + phase) * 0.2 * (0.5 + harmonic * 0.5);
+        // Helper: evaluate point on quadratic bezier at t
+        const bezierAt = (x0, y0, cx, cy, x1, y1, t) => {
+            const u = 1 - t;
+            return [u * u * x0 + 2 * u * t * cx + t * t * x1, u * u * y0 + 2 * u * t * cy + t * t * y1];
+        };
 
-        // --- Kaleidoscope mirrored mushroom clusters ---
+        // Primary branch count based on numSides
+        const primaryCount = 3 + Math.min(2, Math.floor(numSides / 4));
+
         for (let m = 0; m < mirrors; m++) {
             const mirrorAngle = (Math.PI * 2 * m) / mirrors + rot * 0.15 * rotDir;
 
@@ -4362,216 +4326,178 @@ class KaleidoscopeStudio {
             ctx.translate(centerX, centerY);
             ctx.rotate(mirrorAngle);
 
-            // Mycelium threads connecting clusters (drawn first, underneath)
-            const threadCount = 3 + Math.floor(this.seededRandom(seed + 10 + m) * 3);
-            for (let t = 0; t < threadCount; t++) {
-                const tSeed = seed + 50 + m * 20 + t * 7;
-                const t1Angle = (this.seededRandom(tSeed) - 0.5) * (Math.PI / mirrors) * 0.9;
-                const t1Dist = radius * (0.05 + this.seededRandom(tSeed + 1) * 0.15);
-                const t2Angle = (this.seededRandom(tSeed + 2) - 0.5) * (Math.PI / mirrors) * 0.9;
-                const t2Dist = radius * (0.25 + this.seededRandom(tSeed + 3) * 0.5);
-                const threadHue = (cyanHue + this.seededRandom(tSeed + 4) * 30 + hueShift) % 360;
-                const pulseFactor = breathe(this.seededRandom(tSeed + 5) * Math.PI * 2);
+            // --- Build branch network as parallel arrays ---
+            const bStartX = [], bStartY = [], bEndX = [], bEndY = [];
+            const bCtrlX = [], bCtrlY = [], bGen = [], bParent = [];
+            let branchCount = 0;
 
-                const x1 = Math.cos(t1Angle) * t1Dist;
-                const y1 = Math.sin(t1Angle) * t1Dist;
-                const x2 = Math.cos(t2Angle) * t2Dist;
-                const y2 = Math.sin(t2Angle) * t2Dist;
-                const cpx = (x1 + x2) / 2 + (this.seededRandom(tSeed + 6) - 0.5) * radius * 0.15;
-                const cpy = (y1 + y2) / 2 + (this.seededRandom(tSeed + 7) - 0.5) * radius * 0.15;
+            // Primary branches: radiate outward from near center
+            for (let p = 0; p < primaryCount; p++) {
+                const pSeed = seed + 100 + m * 60 + p * 19;
+                const spreadAngle = ((p / primaryCount) - 0.5) * (Math.PI / mirrors) * 0.85;
+                const jitter = (this.seededRandom(pSeed) - 0.5) * 0.15;
+                const angle = spreadAngle + jitter;
+                const startDist = radius * 0.03;
+                const len = radius * orbitFactor * (0.5 + this.seededRandom(pSeed + 1) * 0.3);
 
+                const sx = Math.cos(angle) * startDist;
+                const sy = Math.sin(angle) * startDist;
+                const ex = Math.cos(angle) * (startDist + len);
+                const ey = Math.sin(angle) * (startDist + len);
+
+                // Perpendicular offset for organic curve, breathing with harmonic
+                const perpX = -Math.sin(angle);
+                const perpY = Math.cos(angle);
+                const curveAmt = len * (0.1 + this.seededRandom(pSeed + 2) * 0.15) * (1 + harmonic * 0.3);
+                const curveDir = this.seededRandom(pSeed + 3) > 0.5 ? 1 : -1;
+                const cx = (sx + ex) / 2 + perpX * curveAmt * curveDir;
+                const cy = (sy + ey) / 2 + perpY * curveAmt * curveDir;
+
+                const idx = branchCount++;
+                bStartX[idx] = sx; bStartY[idx] = sy;
+                bEndX[idx] = ex; bEndY[idx] = ey;
+                bCtrlX[idx] = cx; bCtrlY[idx] = cy;
+                bGen[idx] = 0; bParent[idx] = -1;
+
+                // Secondary branches (2-3 per primary)
+                const secCount = 2 + (this.seededRandom(pSeed + 4) > 0.5 ? 1 : 0);
+                for (let s = 0; s < secCount; s++) {
+                    const sSeed = pSeed + 10 + s * 11;
+                    const forkT = 0.4 + this.seededRandom(sSeed) * 0.3;
+                    const [forkX, forkY] = bezierAt(sx, sy, cx, cy, ex, ey, forkT);
+                    const forkAngle = Math.atan2(ey - sy, ex - sx) + (this.seededRandom(sSeed + 1) > 0.5 ? 1 : -1) * (0.4 + this.seededRandom(sSeed + 2) * 0.35);
+                    const secLen = len * (0.5 + this.seededRandom(sSeed + 3) * 0.15);
+                    const sex = forkX + Math.cos(forkAngle) * secLen;
+                    const sey = forkY + Math.sin(forkAngle) * secLen;
+
+                    const sPerpX = -Math.sin(forkAngle);
+                    const sPerpY = Math.cos(forkAngle);
+                    const sCurve = secLen * (0.08 + this.seededRandom(sSeed + 4) * 0.12) * (1 + harmonic * 0.3);
+                    const sCurveDir = this.seededRandom(sSeed + 5) > 0.5 ? 1 : -1;
+                    const scx = (forkX + sex) / 2 + sPerpX * sCurve * sCurveDir;
+                    const scy = (forkY + sey) / 2 + sPerpY * sCurve * sCurveDir;
+
+                    const sIdx = branchCount++;
+                    bStartX[sIdx] = forkX; bStartY[sIdx] = forkY;
+                    bEndX[sIdx] = sex; bEndY[sIdx] = sey;
+                    bCtrlX[sIdx] = scx; bCtrlY[sIdx] = scy;
+                    bGen[sIdx] = 1; bParent[sIdx] = idx;
+
+                    // Tertiary branches (1-2 per secondary)
+                    const terCount = 1 + (this.seededRandom(sSeed + 6) > 0.5 ? 1 : 0);
+                    for (let t = 0; t < terCount; t++) {
+                        const tSeed = sSeed + 20 + t * 7;
+                        const tForkT = 0.5 + this.seededRandom(tSeed) * 0.3;
+                        const [tForkX, tForkY] = bezierAt(forkX, forkY, scx, scy, sex, sey, tForkT);
+                        const tAngle = Math.atan2(sey - forkY, sex - forkX) + (this.seededRandom(tSeed + 1) > 0.5 ? 1 : -1) * (0.3 + this.seededRandom(tSeed + 2) * 0.4);
+                        const tLen = secLen * (0.3 + this.seededRandom(tSeed + 3) * 0.2);
+                        const tex = tForkX + Math.cos(tAngle) * tLen;
+                        const tey = tForkY + Math.sin(tAngle) * tLen;
+                        const tPerpX = -Math.sin(tAngle);
+                        const tPerpY = Math.cos(tAngle);
+                        const tCurve = tLen * 0.1 * (1 + harmonic * 0.3);
+                        const tcx = (tForkX + tex) / 2 + tPerpX * tCurve * (this.seededRandom(tSeed + 4) > 0.5 ? 1 : -1);
+                        const tcy = (tForkY + tey) / 2 + tPerpY * tCurve * (this.seededRandom(tSeed + 4) > 0.5 ? 1 : -1);
+
+                        const tIdx = branchCount++;
+                        bStartX[tIdx] = tForkX; bStartY[tIdx] = tForkY;
+                        bEndX[tIdx] = tex; bEndY[tIdx] = tey;
+                        bCtrlX[tIdx] = tcx; bCtrlY[tIdx] = tcy;
+                        bGen[tIdx] = 2; bParent[tIdx] = sIdx;
+                    }
+                }
+            }
+
+            // --- 1. Draw branch network (back layer) ---
+            ctx.lineCap = 'round';
+            for (let b = 0; b < branchCount; b++) {
+                const gen = bGen[b];
+                const branchHue = (baseHue + this.seededRandom(seed + b * 3) * 20 - 10 + hueShift) % 360;
+                const widthMult = 1.2 - gen * 0.35;
                 ctx.beginPath();
-                ctx.moveTo(x1, y1);
-                ctx.quadraticCurveTo(cpx, cpy, x2, y2);
-                ctx.strokeStyle = `hsla(${threadHue}, ${config.saturation * 0.5}%, ${40 + energy * 15}%, ${0.12 + harmonic * 0.15})`;
-                ctx.lineWidth = thickness * (0.2 + harmonic * 0.3) * pulseFactor;
-                ctx.lineCap = 'round';
+                ctx.moveTo(bStartX[b], bStartY[b]);
+                ctx.quadraticCurveTo(bCtrlX[b], bCtrlY[b], bEndX[b], bEndY[b]);
+                ctx.strokeStyle = `hsla(${branchHue}, ${config.saturation * 0.4}%, ${30 + energy * 20}%, ${0.3 + energy * 0.3})`;
+                ctx.lineWidth = thickness * widthMult;
                 ctx.stroke();
             }
 
-            // Mushroom clusters at various distances
-            const clusterCount = clusterDensity;
-            for (let c = 0; c < clusterCount; c++) {
-                const cSeed = seed + 200 + m * 40 + c * 17;
-                const cAngle = (this.seededRandom(cSeed) - 0.5) * (Math.PI / mirrors) * 0.85;
-                const cDist = radius * orbitFactor * (0.12 + c * 0.2 + this.seededRandom(cSeed + 1) * 0.12);
-                const cx = Math.cos(cAngle) * cDist;
-                const cy = Math.sin(cAngle) * cDist;
+            // --- 2. Nutrient pulses (traveling dots along branches) ---
+            for (let b = 0; b < branchCount; b++) {
+                const bSeed = seed + 700 + m * 50 + b * 3;
+                const pulseSpeed = 0.3 + harmonic * 0.2;
+                const pulseT = ((rot * pulseSpeed + this.seededRandom(bSeed) * 6.28) % 1.0 + 1.0) % 1.0;
+                const [px, py] = bezierAt(bStartX[b], bStartY[b], bCtrlX[b], bCtrlY[b], bEndX[b], bEndY[b], pulseT);
+                const dotR = thickness * 2 * (1 + energy * 0.5);
 
-                // 2-5 mushrooms per cluster
-                const mushCount = 2 + Math.floor(this.seededRandom(cSeed + 2) * 4);
-                for (let f = 0; f < mushCount; f++) {
-                    const fSeed = cSeed + 10 + f * 13;
-                    const fOff = (this.seededRandom(fSeed) - 0.5) * radius * 0.06;
-                    const fOff2 = (this.seededRandom(fSeed + 1) - 0.5) * radius * 0.04;
-                    const fx = cx + fOff;
-                    const fy = cy + fOff2;
-
-                    // Size varies — one dominant, others smaller
-                    const sizeMultiplier = f === 0 ? 1.0 : (0.35 + this.seededRandom(fSeed + 2) * 0.4);
-                    const capW = radius * (0.025 + this.seededRandom(fSeed + 3) * 0.025) * sizeMultiplier
-                        * (0.8 + energy * 0.3) * breathe(fSeed * 0.1);
-                    const capH = capW * (0.45 + this.seededRandom(fSeed + 4) * 0.2);
-                    const stipeH = capW * (1.0 + this.seededRandom(fSeed + 5) * 0.8);
-                    const stipeW = capW * (0.12 + this.seededRandom(fSeed + 6) * 0.08);
-                    const lean = (this.seededRandom(fSeed + 7) - 0.5) * 0.3;
-                    const capHue = (amethystHue + this.seededRandom(fSeed + 8) * 50 - 25 + hueShift) % 360;
-                    const stipeHue = (forestHue + this.seededRandom(fSeed + 9) * 30 + hueShift) % 360;
-
-                    ctx.save();
-                    ctx.translate(fx, fy);
-                    ctx.rotate(lean);
-
-                    // Bioluminescent ground glow beneath mushroom
-                    if (sizeMultiplier > 0.6) {
-                        const gR = capW * 2.5;
-                        const gGrad = ctx.createRadialGradient(0, stipeH * 0.3, 0, 0, stipeH * 0.3, gR);
-                        gGrad.addColorStop(0, `hsla(${cyanHue + hueShift}, ${config.saturation * 0.5}%, 50%, ${0.05 + energy * 0.08})`);
-                        gGrad.addColorStop(1, `hsla(${cyanHue + hueShift}, ${config.saturation * 0.3}%, 35%, 0)`);
-                        ctx.beginPath();
-                        ctx.arc(0, stipeH * 0.3, gR, 0, Math.PI * 2);
-                        ctx.fillStyle = gGrad;
-                        ctx.fill();
-                    }
-
-                    // Stipe (stem) — slight organic taper
-                    ctx.beginPath();
-                    ctx.moveTo(-stipeW, 0);
-                    ctx.quadraticCurveTo(-stipeW * 1.3, stipeH * 0.5, -stipeW * 0.7, stipeH);
-                    ctx.lineTo(stipeW * 0.7, stipeH);
-                    ctx.quadraticCurveTo(stipeW * 1.3, stipeH * 0.5, stipeW, 0);
-                    ctx.closePath();
-                    ctx.fillStyle = `hsla(${stipeHue}, ${config.saturation * 0.35}%, ${42 + energy * 12}%, ${0.3 + energy * 0.25})`;
-                    ctx.fill();
-
-                    // Cap (dome) with SSS glow
-                    const capGrad = ctx.createRadialGradient(0, -capH * 0.4, capW * 0.1, 0, 0, capW);
-                    capGrad.addColorStop(0, `hsla(${capHue}, ${config.saturation * 0.8}%, ${65 + energy * 15}%, ${0.4 + energy * 0.3})`);
-                    capGrad.addColorStop(0.5, `hsla(${capHue}, ${config.saturation * 0.7}%, ${50 + brightness * 10}%, ${0.35 + energy * 0.25})`);
-                    capGrad.addColorStop(1, `hsla(${(capHue + 20) % 360}, ${config.saturation * 0.5}%, 35%, ${0.15 + energy * 0.1})`);
-
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, capW, capH, 0, Math.PI, 0);
-                    ctx.fillStyle = capGrad;
-                    ctx.fill();
-
-                    // Cap rim / edge highlight
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, capW, capH, 0, Math.PI, 0);
-                    ctx.strokeStyle = `hsla(${capHue}, ${config.saturation * 0.7}%, ${60 + brightness * 15}%, ${0.2 + energy * 0.25})`;
-                    ctx.lineWidth = thickness * 0.25;
-                    ctx.stroke();
-
-                    // Gill lines (radial underneath cap)
-                    if (sizeMultiplier > 0.5) {
-                        const gillCount = 5 + Math.floor(capW / (radius * 0.005));
-                        for (let g = 0; g < gillCount; g++) {
-                            const gFrac = g / gillCount;
-                            const gx = -capW * 0.85 + gFrac * capW * 1.7;
-                            ctx.beginPath();
-                            ctx.moveTo(gx, 0);
-                            ctx.lineTo(gx * 0.4, capH * 0.4);
-                            ctx.strokeStyle = `hsla(${(capHue - 15 + 360) % 360}, ${config.saturation * 0.5}%, 50%, ${0.08 + energy * 0.08})`;
-                            ctx.lineWidth = 0.3 + energy * 0.2;
-                            ctx.stroke();
-                        }
-                    }
-
-                    // Cap spots (for larger mushrooms)
-                    if (sizeMultiplier > 0.7 && this.seededRandom(fSeed + 10) > 0.4) {
-                        const spotCount = 2 + Math.floor(this.seededRandom(fSeed + 11) * 3);
-                        for (let sp = 0; sp < spotCount; sp++) {
-                            const spSeed = fSeed + 20 + sp;
-                            const spx = (this.seededRandom(spSeed) - 0.5) * capW * 1.2;
-                            const spy = -capH * (0.2 + this.seededRandom(spSeed + 1) * 0.5);
-                            const spR = capW * (0.06 + this.seededRandom(spSeed + 2) * 0.08);
-                            ctx.beginPath();
-                            ctx.arc(spx, spy, spR, 0, Math.PI * 2);
-                            ctx.fillStyle = `hsla(${(capHue + 40) % 360}, ${config.saturation * 0.4}%, ${70 + brightness * 10}%, ${0.15 + energy * 0.15})`;
-                            ctx.fill();
-                        }
-                    }
-
-                    ctx.restore();
-                }
+                const pGrad = ctx.createRadialGradient(px, py, 0, px, py, dotR * 2);
+                pGrad.addColorStop(0, `hsla(${(pulseHue + hueShift) % 360}, ${config.saturation * 0.8}%, ${65 + energy * 15}%, ${0.4 + energy * 0.3})`);
+                pGrad.addColorStop(1, `hsla(${(pulseHue + hueShift) % 360}, ${config.saturation * 0.5}%, 45%, 0)`);
+                ctx.beginPath();
+                ctx.arc(px, py, dotR * 2, 0, Math.PI * 2);
+                ctx.fillStyle = pGrad;
+                ctx.fill();
             }
 
-            // Spore clouds rising from caps
-            if (energy > 0.2) {
-                const sporeCount = 3 + Math.floor(energy * 8);
-                for (let s = 0; s < sporeCount; s++) {
-                    const sSeed = seed + 500 + m * 15 + s;
-                    const sDist = radius * (0.08 + this.seededRandom(sSeed) * 0.55);
-                    const sAngle = (this.seededRandom(sSeed + 1) - 0.5) * (Math.PI / mirrors);
-                    const drift = Math.sin(rot * 2.5 + this.seededRandom(sSeed + 2) * Math.PI * 2) * radius * 0.03;
-                    const rise = -Math.abs(Math.sin(rot * 1.5 + this.seededRandom(sSeed + 3) * Math.PI)) * radius * 0.04;
-                    const sx = Math.cos(sAngle) * (sDist + drift);
-                    const sy = Math.sin(sAngle) * (sDist + drift) + rise;
-                    const sporeSize = radius * 0.004 * (0.5 + energy * 0.8);
-                    const sporeHue = (amethystHue + this.seededRandom(sSeed + 4) * 40 + hueShift) % 360;
-                    const sporePhase = this.seededRandom(sSeed + 5) * Math.PI * 2;
-                    const sporePulse = 0.5 + Math.sin(rot * 3 + sporePhase) * 0.5;
+            // --- 3. Growing tips (glow dots at tertiary endpoints) ---
+            for (let b = 0; b < branchCount; b++) {
+                if (bGen[b] !== 2) continue;
+                const tSeed = seed + 900 + b * 5;
+                const tipPulse = 1.5 + Math.sin(rot * 3 + this.seededRandom(tSeed) * 6.28) * 0.5;
+                const tipR = thickness * tipPulse;
+                const tipAlpha = 0.3 + energy * 0.4;
 
-                    // Soft glowing spore
-                    const spGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sporeSize * 4);
-                    spGrad.addColorStop(0, `hsla(${sporeHue}, ${config.saturation * 0.7}%, 70%, ${(0.15 + energy * 0.3) * sporePulse})`);
-                    spGrad.addColorStop(1, `hsla(${sporeHue}, ${config.saturation * 0.4}%, 55%, 0)`);
-                    ctx.beginPath();
-                    ctx.arc(sx, sy, sporeSize * 4, 0, Math.PI * 2);
-                    ctx.fillStyle = spGrad;
-                    ctx.fill();
+                const tGrad = ctx.createRadialGradient(bEndX[b], bEndY[b], 0, bEndX[b], bEndY[b], tipR * 2.5);
+                tGrad.addColorStop(0, `hsla(${(tipHue + hueShift) % 360}, ${config.saturation * 0.8}%, ${70 + brightness * 10}%, ${tipAlpha})`);
+                tGrad.addColorStop(1, `hsla(${(tipHue + hueShift) % 360}, ${config.saturation * 0.5}%, 50%, 0)`);
+                ctx.beginPath();
+                ctx.arc(bEndX[b], bEndY[b], tipR * 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = tGrad;
+                ctx.fill();
+            }
 
-                    ctx.beginPath();
-                    ctx.arc(sx, sy, sporeSize, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(${sporeHue}, ${config.saturation * 0.8}%, 80%, ${(0.25 + energy * 0.35) * sporePulse})`;
-                    ctx.fill();
-                }
+            // --- 4. Network nodes (luminous circles at fork junctions) ---
+            for (let b = 0; b < branchCount; b++) {
+                if (bGen[b] === 0) continue; // Only at forks (secondary/tertiary start = parent fork)
+                const nodeR = thickness * 0.8 * (1 + harmonic * 0.3);
+                const nodeAlpha = 0.2 + harmonic * 0.4;
+                ctx.beginPath();
+                ctx.arc(bStartX[b], bStartY[b], nodeR, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${(nodeHue + hueShift) % 360}, ${config.saturation * 0.6}%, ${50 + energy * 15}%, ${nodeAlpha})`;
+                ctx.fill();
+            }
+
+            // --- 5. Spore drift (tiny floating particles) ---
+            const sporeCount = 8 + Math.floor(brightness * 4);
+            for (let s = 0; s < sporeCount; s++) {
+                const sSeed = seed + 1200 + m * 20 + s * 7;
+                const baseDist = radius * (0.1 + this.seededRandom(sSeed) * 0.6) * orbitFactor;
+                const baseAngle = (this.seededRandom(sSeed + 1) - 0.5) * (Math.PI / mirrors) * 0.85;
+                const driftX = Math.sin(rot * (0.5 + this.seededRandom(sSeed + 2) * 0.5) + this.seededRandom(sSeed + 3) * 6.28) * radius * 0.02;
+                const driftY = Math.cos(rot * (0.4 + this.seededRandom(sSeed + 4) * 0.4) + this.seededRandom(sSeed + 5) * 6.28) * radius * 0.02;
+                const sx = Math.cos(baseAngle) * baseDist + driftX;
+                const sy = Math.sin(baseAngle) * baseDist + driftY;
+                const sporeR = 1 + this.seededRandom(sSeed + 6);
+
+                ctx.beginPath();
+                ctx.arc(sx, sy, sporeR, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${(baseHue + hueShift) % 360}, ${config.saturation * 0.4}%, 60%, ${0.1 + brightness * 0.2})`;
+                ctx.fill();
             }
 
             ctx.restore();
         }
 
-        // --- Central mushroom cluster (focal point) ---
-        const coreBreath = breathe(0);
-        const coreCapW = radius * 0.08 * (0.7 + harmonic * 0.4) * coreBreath;
-        const coreCapH = coreCapW * 0.5;
-        const coreStipeH = coreCapW * 1.2;
-        const coreCHue = (amethystHue + hueShift) % 360;
-
-        // Bioluminescent pool
-        const poolR = coreCapW * 3;
-        const poolGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, poolR);
-        poolGrad.addColorStop(0, `hsla(${cyanHue + hueShift}, ${config.saturation * 0.7}%, 55%, ${0.12 + energy * 0.15})`);
-        poolGrad.addColorStop(0.5, `hsla(${amethystHue + hueShift}, ${config.saturation * 0.5}%, 40%, ${0.06 + energy * 0.08})`);
-        poolGrad.addColorStop(1, `hsla(${coreCHue}, ${config.saturation * 0.3}%, 25%, 0)`);
+        // --- 6. Central nexus (after mirror loop) ---
+        const nexusR = radius * 0.06 * (1 + energy * 0.3);
+        const nexusGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, nexusR);
+        nexusGrad.addColorStop(0, `hsla(${(baseHue + hueShift) % 360}, ${config.saturation * 0.7}%, ${60 + energy * 15}%, ${0.3 + energy * 0.35})`);
+        nexusGrad.addColorStop(0.5, `hsla(${(nodeHue + hueShift) % 360}, ${config.saturation * 0.5}%, 45%, ${0.15 + energy * 0.15})`);
+        nexusGrad.addColorStop(1, `hsla(${(baseHue + hueShift) % 360}, ${config.saturation * 0.3}%, 30%, 0)`);
         ctx.beginPath();
-        ctx.arc(centerX, centerY, poolR, 0, Math.PI * 2);
-        ctx.fillStyle = poolGrad;
+        ctx.arc(centerX, centerY, nexusR, 0, Math.PI * 2);
+        ctx.fillStyle = nexusGrad;
         ctx.fill();
-
-        // Central stipe
-        ctx.beginPath();
-        ctx.moveTo(centerX - coreCapW * 0.1, centerY);
-        ctx.quadraticCurveTo(centerX - coreCapW * 0.15, centerY + coreStipeH * 0.5, centerX - coreCapW * 0.06, centerY + coreStipeH);
-        ctx.lineTo(centerX + coreCapW * 0.06, centerY + coreStipeH);
-        ctx.quadraticCurveTo(centerX + coreCapW * 0.15, centerY + coreStipeH * 0.5, centerX + coreCapW * 0.1, centerY);
-        ctx.closePath();
-        ctx.fillStyle = `hsla(${(coreCHue - 30 + 360) % 360}, ${config.saturation * 0.4}%, ${40 + energy * 15}%, ${0.35 + energy * 0.25})`;
-        ctx.fill();
-
-        // Central cap
-        const ccGrad = ctx.createRadialGradient(centerX, centerY - coreCapH * 0.5, 0, centerX, centerY, coreCapW);
-        ccGrad.addColorStop(0, `hsla(${coreCHue}, ${config.saturation * 0.9}%, ${65 + energy * 15}%, ${0.5 + energy * 0.35})`);
-        ccGrad.addColorStop(0.6, `hsla(${coreCHue}, ${config.saturation * 0.7}%, ${50 + brightness * 10}%, ${0.35 + energy * 0.25})`);
-        ccGrad.addColorStop(1, `hsla(${(coreCHue + 30) % 360}, ${config.saturation * 0.4}%, 35%, 0)`);
-
-        ctx.beginPath();
-        ctx.ellipse(centerX, centerY, coreCapW, coreCapH, 0, Math.PI, 0);
-        ctx.fillStyle = ccGrad;
-        ctx.fill();
-        ctx.strokeStyle = `hsla(${coreCHue}, ${config.saturation * 0.7}%, ${60 + brightness * 15}%, ${0.3 + energy * 0.3})`;
-        ctx.lineWidth = thickness * 0.3;
-        ctx.stroke();
     }
 
     /**
