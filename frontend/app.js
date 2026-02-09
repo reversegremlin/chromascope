@@ -5255,46 +5255,6 @@ class KaleidoscopeStudio {
             }
         }
 
-        // --- Harmonic resonance strings between bodies on beats ---
-        if (harmonic > 0.3) {
-            const resAlpha = (harmonic - 0.3) * 0.25;
-            for (let i = 0; i < bodyCount; i++) {
-                const iSeed = seed + i * 37;
-                const iRadBase = radius * (0.15 + i * 0.13 + this.seededRandom(iSeed + 8) * 0.04) * orbitFactor;
-                const iEcc = 0.05 + this.seededRandom(iSeed + 9) * 0.25;
-                const iSpeed = 0.8 / Math.pow((0.15 + i * 0.13), 1.1);
-                const iDir = this.seededRandom(iSeed + 10) > 0.15 ? 1 : -1;
-                const iPhase = this.seededRandom(iSeed + 13) * Math.PI * 2;
-                const iAngle = rot * iSpeed * iDir + iPhase + Math.sin(rot * (0.1 + this.seededRandom(iSeed + 12) * 0.15) + i * 2) * (0.03 + this.seededRandom(iSeed + 11) * 0.06);
-                const iR = iRadBase * (1 - iEcc * Math.cos((rot * iSpeed * iDir + iPhase) * 2)) + energy * radius * 0.04 * orbitFactor;
-                const ix = Math.cos(iAngle) * iR;
-                const iy = Math.sin(iAngle) * iR;
-
-                for (let j = i + 1; j < bodyCount; j++) {
-                    if (this.seededRandom(seed + i * 10 + j) > 0.5) continue;
-                    const jSeed = seed + j * 37;
-                    const jRadBase = radius * (0.15 + j * 0.13 + this.seededRandom(jSeed + 8) * 0.04) * orbitFactor;
-                    const jEcc = 0.05 + this.seededRandom(jSeed + 9) * 0.25;
-                    const jSpeed = 0.8 / Math.pow((0.15 + j * 0.13), 1.1);
-                    const jDir = this.seededRandom(jSeed + 10) > 0.15 ? 1 : -1;
-                    const jPhase = this.seededRandom(jSeed + 13) * Math.PI * 2;
-                    const jAngle = rot * jSpeed * jDir + jPhase + Math.sin(rot * (0.1 + this.seededRandom(jSeed + 12) * 0.15) + j * 2) * (0.03 + this.seededRandom(jSeed + 11) * 0.06);
-                    const jR = jRadBase * (1 - jEcc * Math.cos((rot * jSpeed * jDir + jPhase) * 2)) + energy * radius * 0.04 * orbitFactor;
-                    const jx = Math.cos(jAngle) * jR;
-                    const jy = Math.sin(jAngle) * jR;
-
-                    ctx.beginPath();
-                    ctx.moveTo(ix, iy);
-                    const cpx = (ix + jx) / 2 + Math.sin(rot * 2 + i + j) * radius * 0.03;
-                    const cpy = (iy + jy) / 2 + Math.cos(rot * 2.5 + i - j) * radius * 0.03;
-                    ctx.quadraticCurveTo(cpx, cpy, jx, jy);
-                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.6}%, 60%, ${resAlpha * (0.5 + energy * 0.5)})`;
-                    ctx.lineWidth = 0.5 + energy * 0.8;
-                    ctx.stroke();
-                }
-            }
-        }
-
         // === THE TICKING HAND — gear-shift motion (snaps to discrete positions) ===
         // Quantize to tick positions for mechanical feel
         const ticksPerRev = mirrors * 4;
