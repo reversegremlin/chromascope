@@ -29,7 +29,7 @@ This engine tries to *understand* the character of music by separating **percuss
 
 ### The Kaleidoscope Visualizer
 
-Built-in visualizer with **eight distinct styles**, each mapping audio features to unique transformations:
+Built-in visualizer with **twelve distinct styles**, each mapping audio features to unique transformations:
 
 | Style | Description | Preview |
 |-------|-------------|---------|
@@ -39,8 +39,12 @@ Built-in visualizer with **eight distinct styles**, each mapping audio features 
 | **Spiral** | Hypnotic spiraling arms with flowing motion | ![Spiral](docs/demos/preview_spiral.png) |
 | **Circuit** | Hexagonal grid with glowing circuit traces | ![Circuit](docs/demos/preview_circuit.png) |
 | **Fibonacci** | Golden spiral meets kaleidoscope with phyllotaxis patterns | ![Fibonacci](docs/demos/preview_fibonacci.png) |
-| **Orrery** | Chaotic three-body orrery with brass planets, nested rings, and orbital trails | — |
-| **Quark** | Quantum field visualizer with probability clouds, entangled particles, and interference patterns | — |
+| **DMT** | Hyperspace tunnel of non‑Euclidean, recursively folded geometry and neon fractals | ![DMT](docs/demos/preview_dmt.png) |
+| **Sacred Geometry** | Mandala-style tiling, aperiodic patterns, and temple-like symmetry locks | ![Sacred Geometry](docs/demos/preview_sacred.png) |
+| **Mycelial** | Biomorphic fungal networks, bioluminescent growth, and spore-driven particle blooms | ![Mycelial](docs/demos/preview_mycelial.png) |
+| **Fluid** | Chrome-like ferrofluid blobs with viscous metal ripples and specular reflections | ![Fluid](docs/demos/preview_fluid.png) |
+| **Orrery** | Chaotic three-body orrery with brass planets, nested rings, and orbital trails | ![Orrery](docs/demos/preview_orrery.png) |
+| **Quark** | Quantum field visualizer with probability clouds, entangled particles, and interference patterns | ![Quark](docs/demos/preview_quark.png) |
 
 **Audio-to-Visual Mapping:**
 - **Percussive Impact** → Shape pulsing (drums cause shapes to "kick")
