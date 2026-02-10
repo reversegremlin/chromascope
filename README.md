@@ -29,7 +29,7 @@ This engine tries to *understand* the character of music by separating **percuss
 
 ### The Kaleidoscope Visualizer
 
-Built-in visualizer with **six distinct styles**, each mapping audio features to unique transformations:
+Built-in visualizer with **eight distinct styles**, each mapping audio features to unique transformations:
 
 | Style | Description | Preview |
 |-------|-------------|---------|
@@ -39,6 +39,8 @@ Built-in visualizer with **six distinct styles**, each mapping audio features to
 | **Spiral** | Hypnotic spiraling arms with flowing motion | ![Spiral](docs/demos/preview_spiral.png) |
 | **Circuit** | Hexagonal grid with glowing circuit traces | ![Circuit](docs/demos/preview_circuit.png) |
 | **Fibonacci** | Golden spiral meets kaleidoscope with phyllotaxis patterns | ![Fibonacci](docs/demos/preview_fibonacci.png) |
+| **Orrery** | Chaotic three-body orrery with brass planets, nested rings, and orbital trails | — |
+| **Quark** | Quantum field visualizer with probability clouds, entangled particles, and interference patterns | — |
 
 **Audio-to-Visual Mapping:**
 - **Percussive Impact** → Shape pulsing (drums cause shapes to "kick")
@@ -89,7 +91,7 @@ pip install -e ".[dev]"
 **Analyze audio and generate manifest:**
 
 ```python
-from audio_analysisussy import AudioPipeline
+from chromascope import AudioPipeline
 
 pipeline = AudioPipeline(target_fps=60)
 manifest = pipeline.process_to_manifest("your_song.mp3")
@@ -104,7 +106,7 @@ for frame in manifest["frames"]:
 
 ```python
 from pathlib import Path
-from audio_analysisussy.render_video import render_video
+from chromascope.render_video import render_video
 
 render_video(
     audio_path=Path("your_song.mp3"),
@@ -122,7 +124,7 @@ render_video(
 chromascope song.mp3 -o manifest.json --fps 60 --summary
 
 # Render kaleidoscope video
-python -m audio_analysisussy.render_video song.mp3 -o output.mp4
+python -m chromascope.render_video song.mp3 -o output.mp4
 ```
 
 ### Web Interface (Chromascope Studio)
@@ -172,7 +174,7 @@ The Visual Driver Manifest is a JSON file with frame-by-frame data:
 ## Architecture
 
 ```
-src/audio_analysisussy/
+src/chromascope/
 ├── core/
 │   ├── decomposer.py   # HPSS separation (harmonic/percussive)
 │   ├── analyzer.py     # Feature extraction (beats, energy, chroma)
@@ -204,8 +206,8 @@ frontend/
 ### Pipeline Options
 
 ```python
-from audio_analysisussy import AudioPipeline
-from audio_analysisussy.core.polisher import EnvelopeParams
+from chromascope import AudioPipeline
+from chromascope.core.polisher import EnvelopeParams
 
 pipeline = AudioPipeline(
     target_fps=60,              # Output frame rate
@@ -225,7 +227,7 @@ pipeline = AudioPipeline(
 ### Kaleidoscope Options
 
 ```python
-from audio_analysisussy.visualizers.kaleidoscope import KaleidoscopeConfig
+from chromascope.visualizers.kaleidoscope import KaleidoscopeConfig
 
 config = KaleidoscopeConfig(
     width=1920,
@@ -265,7 +267,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 
 # Run with coverage
-pytest tests/ --cov=src/audio_analysisussy --cov-report=term-missing
+pytest tests/ --cov=src/chromascope --cov-report=term-missing
 ```
 
 ### Test Coverage
