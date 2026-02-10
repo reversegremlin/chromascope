@@ -3,6 +3,150 @@
  * Audio-reactive visualization controller
  */
 
+// Per-style tooltip descriptions for each knob
+const KNOB_TOOLTIPS = {
+    mirrors: {
+        geometric: "Number of mirror segments",
+        glass: "Number of mirror wedges",
+        flower: "Petal count per ring",
+        spiral: "Number of spiral arms",
+        circuit: "Radial symmetry segments",
+        fibonacci: "Kaleidoscope mirror count",
+        dmt: "Symmetry segment count",
+        sacred: "Mandala fold symmetry",
+        mycelial: "Branching radial arms",
+        fluid: "Flow symmetry axes",
+        orrery: "Decorative rings and tick marks",
+        quark: "Mirror segments for fields",
+    },
+    baseRadius: {
+        geometric: "Overall pattern size",
+        glass: "Gem field radius",
+        flower: "Flower bloom size",
+        spiral: "Spiral reach distance",
+        circuit: "Circuit grid extent",
+        fibonacci: "Golden spiral radius",
+        dmt: "Hyperspace field size",
+        sacred: "Mandala outer radius",
+        mycelial: "Network growth radius",
+        fluid: "Fluid field extent",
+        orrery: "Planet count and detail level",
+        quark: "Quantum field extent",
+    },
+    orbitRadius: {
+        geometric: "Ring spacing and reach",
+        glass: "Gem scatter distance",
+        flower: "Petal layer spacing",
+        spiral: "Spiral arm length",
+        circuit: "Circuit ring depth",
+        fibonacci: "Golden rectangle extent",
+        dmt: "Hyperspace layer depth",
+        sacred: "Ring orbit distance",
+        mycelial: "Hyphal reach distance",
+        fluid: "Flow vortex reach",
+        orrery: "Zoom level of the orrery",
+        quark: "Field interaction range",
+    },
+    rotationSpeed: {
+        geometric: "Rotation speed",
+        glass: "Kaleidoscope spin rate",
+        flower: "Petal rotation speed",
+        spiral: "Spiral spin velocity",
+        circuit: "Circuit rotation rate",
+        fibonacci: "Golden spiral spin",
+        dmt: "Hyperspace spin speed",
+        sacred: "Mandala rotation pace",
+        mycelial: "Network drift speed",
+        fluid: "Flow rotation rate",
+        orrery: "Orbital animation speed",
+        quark: "Field phase velocity",
+    },
+    maxScale: {
+        geometric: "Beat punch intensity",
+        glass: "Beat pulse strength",
+        flower: "Beat bloom punch",
+        spiral: "Beat expansion force",
+        circuit: "Beat pulse strength",
+        fibonacci: "Beat growth punch",
+        dmt: "Beat warp intensity",
+        sacred: "Beat pulse strength",
+        mycelial: "Beat growth burst",
+        fluid: "Beat splash intensity",
+        orrery: "Beat flare intensity",
+        quark: "Beat field disruption",
+    },
+    trailAlpha: {
+        geometric: "Motion trail persistence",
+        glass: "Light trail smearing",
+        flower: "Petal trail ghosting",
+        spiral: "Spiral trail echo",
+        circuit: "Trace afterglow length",
+        fibonacci: "Pattern trail decay",
+        dmt: "Hyperspace trail blur",
+        sacred: "Mandala trail echo",
+        mycelial: "Network trail fade",
+        fluid: "Flow trail smear",
+        orrery: "Orbital motion trails",
+        quark: "Field trail persistence",
+    },
+    minSides: {
+        geometric: "Minimum polygon sides",
+        glass: "Minimum gem facets",
+        flower: "Min petal layers",
+        spiral: "Min node polygon sides",
+        circuit: "Min circuit node sides",
+        fibonacci: "Min phyllotaxis facets",
+        dmt: "Min geometry complexity",
+        sacred: "Min sacred geometry sides",
+        mycelial: "Min node polygon sides",
+        fluid: "Min vortex facets",
+        orrery: "Min tick mark complexity",
+        quark: "Min quark count",
+    },
+    maxSides: {
+        geometric: "Maximum polygon sides",
+        glass: "Maximum gem facets",
+        flower: "Max petal layers",
+        spiral: "Max node polygon sides",
+        circuit: "Max circuit node sides",
+        fibonacci: "Max phyllotaxis facets",
+        dmt: "Max geometry complexity",
+        sacred: "Max sacred geometry sides",
+        mycelial: "Max node polygon sides",
+        fluid: "Max vortex facets",
+        orrery: "Max tick mark complexity",
+        quark: "Max quark count",
+    },
+    baseThickness: {
+        geometric: "Base line thickness",
+        glass: "Base gem stroke weight",
+        flower: "Base petal stroke width",
+        spiral: "Base spiral line weight",
+        circuit: "Base trace thickness",
+        fibonacci: "Base stroke weight",
+        dmt: "Base geometry stroke",
+        sacred: "Base mandala line width",
+        mycelial: "Base hyphal thickness",
+        fluid: "Base flow line weight",
+        orrery: "Base brass line weight",
+        quark: "Base field line thickness",
+    },
+    maxThickness: {
+        geometric: "Max line thickness on beats",
+        glass: "Max gem stroke on beats",
+        flower: "Max petal stroke on beats",
+        spiral: "Max spiral width on beats",
+        circuit: "Max trace width on beats",
+        fibonacci: "Max stroke on beats",
+        dmt: "Max geometry stroke on beats",
+        sacred: "Max mandala width on beats",
+        mycelial: "Max hyphal width on beats",
+        fluid: "Max flow width on beats",
+        orrery: "Max brass width on beats",
+        quark: "Max field width on beats",
+    },
+};
+
 class KaleidoscopeStudio {
     constructor() {
         // Configuration state
@@ -80,6 +224,11 @@ class KaleidoscopeStudio {
         this.accumulatedRotation = 0;
         this.lastFrameTime = performance.now();
 
+        // Binary star orrery simulation state
+        this._binaryState = null;
+        this._binaryLastRot = 0;
+        this._binarySeed = -1;
+
         // Smoothed values for fluid animation
         this.smoothedValues = {
             percussiveImpact: 0,
@@ -110,6 +259,7 @@ class KaleidoscopeStudio {
     init() {
         this.setupEventListeners();
         this.setupKnobs();
+        this.updateKnobTooltips();
         this.initParticles();
         this.render();
         this.startAnimationLoop();
@@ -165,6 +315,7 @@ class KaleidoscopeStudio {
                 document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.config.style = btn.dataset.style;
+                this.updateKnobTooltips();
                 // Show/hide glass-specific controls
                 if (glassSlicesControl) {
                     if (btn.dataset.style === 'glass') {
@@ -372,6 +523,22 @@ class KaleidoscopeStudio {
                 const delta = e.deltaY > 0 ? -step : step;
                 updateKnob(value + delta);
             });
+        });
+    }
+
+    updateKnobTooltips() {
+        const style = this.config.style;
+        document.querySelectorAll('.knob-control').forEach(control => {
+            const knob = control.querySelector('.knob');
+            if (!knob) return;
+            const param = knob.dataset.param;
+            if (!param || !KNOB_TOOLTIPS[param]) return;
+            const tip = KNOB_TOOLTIPS[param][style] || '';
+            if (tip) {
+                control.setAttribute('data-tooltip', tip);
+            } else {
+                control.removeAttribute('data-tooltip');
+            }
         });
     }
 
@@ -2331,44 +2498,50 @@ class KaleidoscopeStudio {
             hue = this.hexToHsl(config.accentColor).h;
         }
 
+        // Per-style size normalization — keeps visual footprint consistent across styles
+        const sizeScale = {
+            circuit: 0.75, fibonacci: 1.15, dmt: 1.1, fluid: 1.5, quark: 1.3
+        }[config.style] || 1.0;
+        const scaledRadius = radius * sizeScale;
+
         // Render based on selected style
         switch (config.style) {
             case 'glass':
-                this.renderGlassStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderGlassStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'flower':
-                this.renderFlowerStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderFlowerStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'spiral':
-                this.renderSpiralStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderSpiralStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'circuit':
-                this.renderCircuitStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderCircuitStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'fibonacci':
-                this.renderFibonacciStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderFibonacciStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'dmt':
-                this.renderDMTStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderDMTStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'sacred':
-                this.renderSacredStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderSacredStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'mycelial':
-                this.renderMycelialStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderMycelialStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'fluid':
-                this.renderFluidStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderFluidStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'orrery':
-                this.renderOrreryStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderOrreryStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'quark':
-                this.renderQuarkStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderQuarkStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'geometric':
             default:
-                this.renderGeometricStyle(ctx, centerX, centerY, radius, numSides, hue, thickness);
+                this.renderGeometricStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
         }
     }
@@ -2489,6 +2662,7 @@ class KaleidoscopeStudio {
         const harmonic = this.smoothedValues.harmonicEnergy;
         const brightness = this.smoothedValues.spectralBrightness;
         const seed = config.shapeSeed;
+        const orbitFactor = config.orbitRadius / 200;
 
         ctx.save();
         ctx.translate(centerX, centerY);
@@ -2503,7 +2677,7 @@ class KaleidoscopeStudio {
             if (m % 2 === 1) {
                 ctx.scale(-1, 1);
             }
-            this.drawGlassWedge(ctx, radius, hue, thickness, seed, m);
+            this.drawGlassWedge(ctx, radius, hue, thickness, seed, m, numSides, orbitFactor);
             ctx.restore();
         }
 
@@ -2511,10 +2685,10 @@ class KaleidoscopeStudio {
 
         // Multi-layered central jewel
         const jewelSize = radius * (0.3 + energy * 0.25);
-        this.drawCentralJewel(ctx, centerX, centerY, jewelSize, hue, energy);
+        this.drawCentralJewel(ctx, centerX, centerY, jewelSize, hue, energy, numSides, thickness);
     }
 
-    drawGlassWedge(ctx, maxRadius, hue, thickness, baseSeed, wedgeIndex) {
+    drawGlassWedge(ctx, maxRadius, hue, thickness, baseSeed, wedgeIndex, numSides, orbitFactor) {
         const config = this.config;
         const energy = this.smoothedValues.percussiveImpact;
         const harmonic = this.smoothedValues.harmonicEnergy;
@@ -2562,7 +2736,7 @@ class KaleidoscopeStudio {
                 ctx.fillStyle = `hsla(${gemHue}, ${config.saturation}%, ${gemLightness}%, ${gemAlpha})`;
                 ctx.fill();
                 ctx.strokeStyle = `hsla(${gemHue}, ${config.saturation * 0.8}%, ${gemLightness + 20}%, ${gemAlpha * 0.7})`;
-                ctx.lineWidth = 0.5 + energy * 0.8;
+                ctx.lineWidth = thickness * (0.15 + energy * 0.25);
                 ctx.stroke();
 
                 // Downward triangle (inverted)
@@ -2582,7 +2756,7 @@ class KaleidoscopeStudio {
         const numGems = 4 + Math.floor(config.glassSlices / 10);
         for (let i = 0; i < numGems; i++) {
             const seed = baseSeed + 500 + i * 23.7;
-            const dist = maxRadius * (0.15 + this.seededRandom(seed) * 0.65);
+            const dist = maxRadius * (0.15 + this.seededRandom(seed) * 0.65) * orbitFactor;
             const angle = this.seededRandom(seed + 1) * wedgeAngle * 0.9;
             const gemSize = (30 + this.seededRandom(seed + 2) * 60) * (0.8 + energy * 0.5);
             const gemHue = (hue + this.seededRandom(seed + 3) * 80 - 30 + harmonic * 40) % 360;
@@ -2595,8 +2769,8 @@ class KaleidoscopeStudio {
             ctx.translate(x, y);
             ctx.rotate(gemRotation);
 
-            // Draw hexagonal gem with internal facet lines
-            const sides = 6;
+            // Draw gem with internal facet lines (sides from numSides knob)
+            const sides = numSides;
             const points = [];
             for (let j = 0; j < sides; j++) {
                 const a = (Math.PI * 2 * j) / sides;
@@ -2612,7 +2786,7 @@ class KaleidoscopeStudio {
             ctx.fillStyle = `hsla(${gemHue}, ${config.saturation}%, ${45 + brightness * 20}%, ${alpha})`;
             ctx.fill();
             ctx.strokeStyle = `hsla(${gemHue}, ${config.saturation}%, ${70 + energy * 15}%, ${alpha + 0.25})`;
-            ctx.lineWidth = 1 + energy * 1.5;
+            ctx.lineWidth = thickness * (0.3 + energy * 0.4);
             ctx.stroke();
 
             // Internal facet lines - from center to each vertex (gem cut pattern)
@@ -2621,11 +2795,11 @@ class KaleidoscopeStudio {
                 ctx.moveTo(0, 0);
                 ctx.lineTo(points[j].x, points[j].y);
                 ctx.strokeStyle = `hsla(${(gemHue + 20) % 360}, ${config.saturation * 0.7}%, 75%, ${alpha * 0.5})`;
-                ctx.lineWidth = 0.5 + energy * 0.5;
+                ctx.lineWidth = thickness * (0.15 + energy * 0.15);
                 ctx.stroke();
             }
 
-            // Inner facet (smaller hex rotated) - creates depth
+            // Inner facet (smaller polygon rotated) - creates depth
             const innerScale = 0.5 + energy * 0.15;
             const innerRot = Math.PI / sides;
             ctx.beginPath();
@@ -2639,7 +2813,7 @@ class KaleidoscopeStudio {
             ctx.fillStyle = `hsla(${(gemHue + 40) % 360}, ${config.saturation}%, ${60 + energy * 25}%, ${alpha * 0.6})`;
             ctx.fill();
             ctx.strokeStyle = `hsla(${(gemHue + 40) % 360}, ${config.saturation * 0.8}%, 80%, ${alpha * 0.4})`;
-            ctx.lineWidth = 0.5;
+            ctx.lineWidth = thickness * 0.15;
             ctx.stroke();
 
             ctx.restore();
@@ -2740,7 +2914,7 @@ class KaleidoscopeStudio {
             ctx.fill();
 
             ctx.strokeStyle = `hsla(${shapeHue}, ${config.saturation}%, 90%, ${alpha * 0.6})`;
-            ctx.lineWidth = 0.8 + energy * 0.5;
+            ctx.lineWidth = thickness * (0.25 + energy * 0.15);
             ctx.stroke();
 
             // Internal facet line
@@ -2748,7 +2922,7 @@ class KaleidoscopeStudio {
             ctx.moveTo(0, -size * 1.2);
             ctx.lineTo(0, size * 0.8);
             ctx.strokeStyle = `hsla(${shapeHue}, ${config.saturation * 0.5}%, 85%, ${alpha * 0.3})`;
-            ctx.lineWidth = 0.5;
+            ctx.lineWidth = thickness * 0.15;
             ctx.stroke();
 
             ctx.restore();
@@ -2757,8 +2931,10 @@ class KaleidoscopeStudio {
         ctx.restore();
     }
 
-    drawCentralJewel(ctx, centerX, centerY, radius, hue, energy) {
+    drawCentralJewel(ctx, centerX, centerY, radius, hue, energy, numSides, thickness) {
         const config = this.config;
+        numSides = numSides || 6;
+        thickness = thickness || 3;
 
         // Pulsing outer glow
         const glowSize = radius * (1.8 + energy * 0.6);
@@ -2771,8 +2947,8 @@ class KaleidoscopeStudio {
         ctx.arc(centerX, centerY, glowSize, 0, Math.PI * 2);
         ctx.fill();
 
-        // Faceted jewel - hexagonal with internal geometry
-        const sides = 6;
+        // Faceted jewel - polygon with internal geometry
+        const sides = numSides;
         const jewPoints = [];
         for (let i = 0; i < sides; i++) {
             const a = (Math.PI * 2 * i) / sides + this.accumulatedRotation * 0.3;
@@ -2800,11 +2976,11 @@ class KaleidoscopeStudio {
             ctx.moveTo(centerX, centerY);
             ctx.lineTo(jewPoints[i].x, jewPoints[i].y);
             ctx.strokeStyle = `hsla(${(hue + i * 20) % 360}, ${config.saturation * 0.6}%, 80%, ${0.25 + energy * 0.2})`;
-            ctx.lineWidth = 0.8 + energy * 0.5;
+            ctx.lineWidth = thickness * (0.25 + energy * 0.15);
             ctx.stroke();
         }
 
-        // Inner rotated hex
+        // Inner rotated polygon
         const innerRadius = radius * (0.55 + energy * 0.1);
         ctx.beginPath();
         for (let i = 0; i < sides; i++) {
@@ -2815,7 +2991,7 @@ class KaleidoscopeStudio {
         }
         ctx.closePath();
         ctx.strokeStyle = `hsla(${(hue + 40) % 360}, ${config.saturation}%, 80%, ${0.3 + energy * 0.3})`;
-        ctx.lineWidth = 1 + energy;
+        ctx.lineWidth = thickness * (0.3 + energy * 0.3);
         ctx.stroke();
 
         // Bright pulsing core
@@ -2972,25 +3148,25 @@ class KaleidoscopeStudio {
         // LAYER 0: Deep background spirals - slow, ghostly
         ctx.save();
         ctx.rotate(-this.accumulatedRotation * 0.15);
-        this.drawFractalLayer(ctx, arms, radius * orbitFactor, hue, seed, 0, energy, harmonic, brightness, thickness);
+        this.drawFractalLayer(ctx, arms, radius * orbitFactor, hue, seed, 0, energy, harmonic, brightness, thickness, numSides);
         ctx.restore();
 
         // LAYER 1: Main spiral arms - medium speed, full reactivity
         ctx.save();
         ctx.rotate(this.accumulatedRotation * (0.4 + harmonic * 0.2));
-        this.drawFractalLayer(ctx, arms, radius * orbitFactor * (0.8 + energy * 0.3), (hue + 30) % 360, seed + 100, 1, energy, harmonic, brightness, thickness);
+        this.drawFractalLayer(ctx, arms, radius * orbitFactor * (0.8 + energy * 0.3), (hue + 30) % 360, seed + 100, 1, energy, harmonic, brightness, thickness, numSides);
         ctx.restore();
 
         // LAYER 2: Counter-rotating spirals - creates depth
         ctx.save();
         ctx.rotate(-this.accumulatedRotation * (0.6 + energy * 0.25));
-        this.drawFractalLayer(ctx, arms + 2, radius * orbitFactor * (0.6 + harmonic * 0.2), (hue + 60) % 360, seed + 200, 2, energy, harmonic, brightness, thickness);
+        this.drawFractalLayer(ctx, arms + 2, radius * orbitFactor * (0.6 + harmonic * 0.2), (hue + 60) % 360, seed + 200, 2, energy, harmonic, brightness, thickness, numSides);
         ctx.restore();
 
         // LAYER 3: Fast inner spirals - very reactive
         ctx.save();
         ctx.rotate(this.accumulatedRotation * (1.0 + energy * 0.5));
-        this.drawFractalLayer(ctx, arms * 2, radius * orbitFactor * (0.35 + energy * 0.15), (hue + 120) % 360, seed + 300, 3, energy, harmonic, brightness, thickness);
+        this.drawFractalLayer(ctx, arms * 2, radius * orbitFactor * (0.35 + energy * 0.15), (hue + 120) % 360, seed + 300, 3, energy, harmonic, brightness, thickness, numSides);
         ctx.restore();
 
         // Fractal sub-spirals at branch points
@@ -3002,7 +3178,7 @@ class KaleidoscopeStudio {
         ctx.restore();
     }
 
-    drawFractalLayer(ctx, arms, maxRadius, hue, seed, layer, energy, harmonic, brightness, thickness) {
+    drawFractalLayer(ctx, arms, maxRadius, hue, seed, layer, energy, harmonic, brightness, thickness, numSides) {
         const config = this.config;
 
         // Spiral parameters that react to audio
@@ -3072,9 +3248,16 @@ class KaleidoscopeStudio {
                 ctx.fillStyle = `hsla(${nodeHue}, ${config.saturation}%, 70%, ${0.1 + energy * 0.2})`;
                 ctx.fill();
 
-                // Inner bright core
+                // Inner bright core — polygon shape from numSides
+                const nodeRot = this.accumulatedRotation * 0.5 + n * 0.3;
                 ctx.beginPath();
-                ctx.arc(x, y, nodeSize, 0, Math.PI * 2);
+                for (let ns = 0; ns < numSides; ns++) {
+                    const na = (Math.PI * 2 * ns) / numSides + nodeRot;
+                    const nx = x + Math.cos(na) * nodeSize;
+                    const ny = y + Math.sin(na) * nodeSize;
+                    ns === 0 ? ctx.moveTo(nx, ny) : ctx.lineTo(nx, ny);
+                }
+                ctx.closePath();
                 ctx.fillStyle = `hsla(${nodeHue}, ${config.saturation}%, ${75 + energy * 20}%, ${0.6 + energy * 0.4})`;
                 ctx.fill();
             }
@@ -3316,20 +3499,20 @@ class KaleidoscopeStudio {
                     // Dynamic hex size
                     const dynamicHexSize = hexSize * (0.8 + brightness * 0.4);
 
-                    // Draw hexagon
+                    // Draw polygon (sides from numSides knob)
                     const hexPoints = [];
-                    for (let i = 0; i < 6; i++) {
-                        const a = (Math.PI / 3) * i + Math.PI / 6 + this.accumulatedRotation * 0.5;
+                    for (let i = 0; i < numSides; i++) {
+                        const a = (Math.PI * 2 / numSides) * i + Math.PI / numSides + this.accumulatedRotation * 0.5;
                         hexPoints.push({
                             x: hx + dynamicHexSize * 0.8 * Math.cos(a),
                             y: hy + dynamicHexSize * 0.8 * Math.sin(a)
                         });
                     }
 
-                    // Hexagon outline
+                    // Polygon outline
                     ctx.beginPath();
                     ctx.moveTo(hexPoints[0].x, hexPoints[0].y);
-                    for (let i = 1; i < 6; i++) {
+                    for (let i = 1; i < numSides; i++) {
                         ctx.lineTo(hexPoints[i].x, hexPoints[i].y);
                     }
                     ctx.closePath();
@@ -3342,8 +3525,8 @@ class KaleidoscopeStudio {
                     if (this.seededRandom(nodeSeed) > 0.35) {
                         const traceCount = 1 + Math.floor(this.seededRandom(nodeSeed + 1) * 2);
                         for (let t = 0; t < traceCount; t++) {
-                            const startIdx = Math.floor(this.seededRandom(nodeSeed + t * 10) * 6);
-                            const endIdx = (startIdx + 3) % 6;
+                            const startIdx = Math.floor(this.seededRandom(nodeSeed + t * 10) * numSides);
+                            const endIdx = (startIdx + Math.floor(numSides / 2)) % numSides;
 
                             ctx.beginPath();
                             ctx.moveTo(hexPoints[startIdx].x, hexPoints[startIdx].y);
@@ -3400,10 +3583,10 @@ class KaleidoscopeStudio {
         // Central core - size based on radius
         const coreSize = radius * 0.4 * (0.8 + energy * 0.4);
 
-        // Core hexagon with mirrors sides
+        // Core polygon (sides from numSides knob)
         ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const a = (Math.PI / 3) * i + this.accumulatedRotation * 2;
+        for (let i = 0; i < numSides; i++) {
+            const a = (Math.PI * 2 / numSides) * i + this.accumulatedRotation * 2;
             const x = coreSize * Math.cos(a);
             const y = coreSize * Math.sin(a);
             if (i === 0) ctx.moveTo(x, y);
@@ -3414,10 +3597,10 @@ class KaleidoscopeStudio {
         ctx.lineWidth = thickness * (1 + energy * 0.8);
         ctx.stroke();
 
-        // Inner rotating hexagon
+        // Inner rotating polygon
         ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const a = (Math.PI / 3) * i - this.accumulatedRotation * 3;
+        for (let i = 0; i < numSides; i++) {
+            const a = (Math.PI * 2 / numSides) * i - this.accumulatedRotation * 3;
             const x = coreSize * 0.5 * Math.cos(a);
             const y = coreSize * 0.5 * Math.sin(a);
             if (i === 0) ctx.moveTo(x, y);
@@ -3516,8 +3699,8 @@ class KaleidoscopeStudio {
 
             // Main element - alternate between circles and tiny polygons
             if (n % 3 === 0) {
-                // Small hexagonal gem
-                const sides = 6;
+                // Small gem (sides from numSides knob)
+                const sides = numSides;
                 ctx.beginPath();
                 for (let s = 0; s < sides; s++) {
                     const sa = (Math.PI * 2 * s) / sides + angle * 0.3;
@@ -3626,7 +3809,7 @@ class KaleidoscopeStudio {
         // --- Central sacred geometry core ---
         // Vesica piscis / seed of life pattern
         const coreSize = radius * 0.18 * (0.85 + energy * 0.4);
-        const coreCircles = 6;
+        const coreCircles = numSides;
         for (let c = 0; c < coreCircles; c++) {
             const cAngle = (Math.PI * 2 * c) / coreCircles + this.accumulatedRotation * 0.5;
             const cx = Math.cos(cAngle) * coreSize * 0.5;
@@ -4916,456 +5099,776 @@ class KaleidoscopeStudio {
     }
 
     /**
-     * Orrery style — Broken steampunk orrery with three-body suns, varied celestial bodies,
-     * brass armatures, and independent rotations. Each body is unique via seed-driven shape selection.
+     * Update binary star orrery simulation with N-body planet interactions.
+     * Binary stars are computed analytically (guaranteed stable circular orbit).
+     * Planets experience gravity from both stars and all other planets.
+     *
+     * @param {number} dt - Time step
+     * @param {number} bassEnergy - Current bass/percussive energy [0,1]
+     * @param {number} seed - Shape seed for deterministic initialization
+     * @returns {{ starA: {x,y}, starB: {x,y}, binaryAngle: number, planets: Array }}
+     */
+    _updateBinaryOrrery(dt, bassEnergy, seed) {
+        const G = 1.0;
+        const massA = 1.0;
+        const massB = 0.8;
+        const totalMass = massA + massB;
+        const binarySep = 0.5; // semi-major axis of binary
+
+        // --- Planet specification table ---
+        const planetSpecs = [
+            { name: "vulcan",   R: 1.3, mass: 0.0005 },
+            { name: "terra",    R: 1.7, mass: 0.003  },
+            { name: "aridus",   R: 2.1, mass: 0.001  },
+            { name: "colossus", R: 2.9, mass: 0.05   },
+            { name: "aurelian", R: 3.6, mass: 0.03   },
+            { name: "glacius",  R: 4.2, mass: 0.008  },
+            { name: "tempest",  R: 4.8, mass: 0.006  },
+            { name: "wanderer", R: 5.5, mass: 0.0001 },
+        ];
+
+        // --- Initialize or reset state on seed change ---
+        if (!this._binaryState || this._binarySeed !== seed) {
+            this._binarySeed = seed;
+            this._binaryLastRot = null;
+
+            const planets = planetSpecs.map((spec, i) => {
+                const phase = this.seededRandom(seed + i * 137 + 7) * Math.PI * 2;
+                const circularV = Math.sqrt(G * totalMass / spec.R);
+                // Slight eccentricity perturbation from seed (±4%)
+                const perturbation = 1.0 + (this.seededRandom(seed + i * 251 + 41) - 0.5) * 0.08;
+                const v = circularV * perturbation;
+                return {
+                    x: spec.R * Math.cos(phase),
+                    y: spec.R * Math.sin(phase),
+                    vx: -v * Math.sin(phase),
+                    vy:  v * Math.cos(phase),
+                    mass: spec.mass,
+                    trail: [],
+                };
+            });
+
+            this._binaryState = {
+                binaryAngle: 0,
+                planets: planets,
+            };
+        }
+
+        const state = this._binaryState;
+
+        // --- Binary angular velocity (analytical circular orbit) ---
+        const omega = Math.sqrt(G * totalMass / (binarySep * binarySep * binarySep));
+
+        // Bass energy speeds up binary rotation
+        const bassSpeedup = 1.0 + bassEnergy * 2.0;
+        state.binaryAngle += omega * dt * bassSpeedup;
+
+        // --- Analytical star positions (orbit barycenter at origin) ---
+        // Star A orbits at distance (massB/totalMass)*a from barycenter
+        const rA = (massB / totalMass) * binarySep;
+        const rB = (massA / totalMass) * binarySep;
+        const angle = state.binaryAngle;
+
+        const starA = {
+            x:  rA * Math.cos(angle),
+            y:  rA * Math.sin(angle),
+        };
+        const starB = {
+            x: -rB * Math.cos(angle),
+            y: -rB * Math.sin(angle),
+        };
+
+        // --- N-body integration for planets (8 substeps) ---
+        const substeps = 8;
+        const subDt = dt / substeps;
+        const planets = state.planets;
+
+        for (let step = 0; step < substeps; step++) {
+            // Compute accelerations for all planets
+            const ax = new Float64Array(planets.length);
+            const ay = new Float64Array(planets.length);
+
+            for (let i = 0; i < planets.length; i++) {
+                const p = planets[i];
+
+                // Gravity from Star A
+                let dxA = starA.x - p.x;
+                let dyA = starA.y - p.y;
+                let distA = Math.sqrt(dxA * dxA + dyA * dyA);
+                distA = Math.max(distA, 0.05); // softening for stars
+                let forceA = G * massA / (distA * distA * distA);
+                ax[i] += forceA * dxA;
+                ay[i] += forceA * dyA;
+
+                // Gravity from Star B
+                let dxB = starB.x - p.x;
+                let dyB = starB.y - p.y;
+                let distB = Math.sqrt(dxB * dxB + dyB * dyB);
+                distB = Math.max(distB, 0.05);
+                let forceB = G * massB / (distB * distB * distB);
+                ax[i] += forceB * dxB;
+                ay[i] += forceB * dyB;
+
+                // Gravity from all other planets (N-body)
+                for (let j = 0; j < planets.length; j++) {
+                    if (j === i) continue;
+                    const other = planets[j];
+                    let dx = other.x - p.x;
+                    let dy = other.y - p.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    let safeDist = Math.max(dist, 0.15); // softened for planet-planet
+                    let force = G * other.mass / (safeDist * safeDist * safeDist);
+                    ax[i] += force * dx;
+                    ay[i] += force * dy;
+                }
+            }
+
+            // Apply accelerations and integrate positions
+            for (let i = 0; i < planets.length; i++) {
+                const p = planets[i];
+
+                // Bass reactivity: tangential kick to speed up orbits
+                if (bassEnergy > 0.3) {
+                    const r = Math.sqrt(p.x * p.x + p.y * p.y);
+                    if (r > 0.01) {
+                        const tangX = -p.y / r;
+                        const tangY =  p.x / r;
+                        const kick = (bassEnergy - 0.3) * 0.3 * subDt;
+                        p.vx += tangX * kick;
+                        p.vy += tangY * kick;
+                    }
+                }
+
+                p.vx += ax[i] * subDt;
+                p.vy += ay[i] * subDt;
+
+                // Speed clamp
+                let speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+                if (speed > 4.0) {
+                    p.vx *= 4.0 / speed;
+                    p.vy *= 4.0 / speed;
+                }
+
+                p.x += p.vx * subDt;
+                p.y += p.vy * subDt;
+
+                // Soft boundary at r > 6.0 — gentle inward nudge
+                let r = Math.sqrt(p.x * p.x + p.y * p.y);
+                if (r > 6.0) {
+                    let pullback = (r - 6.0) * 0.5 * subDt;
+                    p.vx -= (p.x / r) * pullback;
+                    p.vy -= (p.y / r) * pullback;
+                }
+            }
+        }
+
+        // --- Record trails (last 80 positions per planet) ---
+        for (let i = 0; i < planets.length; i++) {
+            const p = planets[i];
+            p.trail.push({ x: p.x, y: p.y });
+            if (p.trail.length > 150) {
+                p.trail.shift();
+            }
+        }
+
+        return {
+            starA: starA,
+            starB: starB,
+            binaryAngle: state.binaryAngle,
+            planets: planets,
+        };
+    }
+
+    /**
+     * Render the Orrery visualization style — a mechanical brass orrery
+     * with tilted perspective disc, concentric orbit tracks, armature arms,
+     * and planets on stalks above the disc plane.
      */
     renderOrreryStyle(ctx, centerX, centerY, radius, numSides, hue, thickness) {
         const config = this.config;
-        const seed = config.shapeSeed;
         const energy = this.smoothedValues.percussiveImpact;
         const harmonic = this.smoothedValues.harmonicEnergy;
         const brightness = this.smoothedValues.spectralBrightness;
-        const mirrors = config.mirrors;
         const rot = this.accumulatedRotation;
-        const orbitFactor = config.orbitRadius / 200;
-        const sat = config.saturation;
+        const seed = config.shapeSeed;
+        const sat = config.saturation || 80;
+        const mirrors = config.mirrors;
 
-        const brassHue = (hue + 30) % 360;
+        // ORBIT = zoom, SIZE = density (more planets/detail)
+        const orbitFactor = (config.orbitRadius || 200) / 200;
+        const sizeNorm = (config.baseRadius || 150) / 150;
+        const density = sizeNorm;
+        const visiblePlanets = Math.min(8, Math.max(2, Math.floor(1 + sizeNorm * 4.5)));
+
+        // =====================================================================
+        // Simulation
+        // =====================================================================
+        let simDt = 0;
+        if (this._binaryLastRot !== null && this._binaryLastRot !== undefined) {
+            let delta = rot - this._binaryLastRot;
+            if (Math.abs(delta) > 0.5) delta = 0;
+            simDt = Math.max(0.002, Math.min(Math.abs(delta), 0.01));
+        }
+        this._binaryLastRot = rot;
+
+        const sim = this._updateBinaryOrrery(simDt, energy, seed);
+        const { starA, starB, binaryAngle, planets } = sim;
+
+        // =====================================================================
+        // Orrery geometry
+        // =====================================================================
+        const canvasBase = Math.min(centerX, centerY);
+        const discRadius = canvasBase * 0.75 * orbitFactor;
+        const tilt = 0.38; // perspective compression
+        const simScale = discRadius / 6.0; // map simulation radius 6 to disc edge
+
+        // Planet rendering specs
+        const planetSpecs = [
+            { name: "vulcan",   sizeM: 0.015, color: [30, 15, 45],  ring: false },
+            { name: "terra",    sizeM: 0.022, color: [200, 65, 50],  ring: false },
+            { name: "aridus",   sizeM: 0.018, color: [15, 75, 48],   ring: false },
+            { name: "colossus", sizeM: 0.065, color: [30, 60, 58],   ring: false },
+            { name: "aurelian", sizeM: 0.050, color: [42, 55, 62],   ring: true  },
+            { name: "glacius",  sizeM: 0.032, color: [178, 55, 60],  ring: true  },
+            { name: "tempest",  sizeM: 0.028, color: [230, 60, 48],  ring: false },
+            { name: "wanderer", sizeM: 0.010, color: [210, 20, 75],  ring: false },
+        ];
+
+        const brassHue = 42;
+        const brassSat = 65;
 
         ctx.save();
         ctx.translate(centerX, centerY);
 
-        // === TRI-SUNS: Three central bodies in chaotic three-body orbit ===
-        const sunOrbitR = radius * 0.12 * orbitFactor * (0.8 + energy * 0.5);
-        const sunPositions = [];
-        for (let s = 0; s < 3; s++) {
-            const phase = (Math.PI * 2 * s) / 3;
-            const chaosA = Math.sin(rot * 0.7 + phase) + 0.3 * Math.sin(rot * 1.3 + phase * 2.1)
-                + 0.15 * Math.cos(rot * 2.1 - phase * 0.7);
-            const chaosB = Math.cos(rot * 0.9 + phase) + 0.3 * Math.cos(rot * 1.7 - phase * 1.7)
-                + 0.15 * Math.sin(rot * 2.5 + phase * 1.3);
-            const sx = chaosA * sunOrbitR;
-            const sy = chaosB * sunOrbitR;
-            sunPositions.push({ x: sx, y: sy });
-            const sunSize = radius * (0.04 + energy * 0.025) * orbitFactor;
-            const sunHue = (brassHue + s * 25) % 360;
-            // Each sun self-rotates
-            const selfRot = rot * (1.5 + s * 0.7);
+        // =====================================================================
+        // 1. THE BRASS DISC — filled tilted ellipse with golden gradient
+        // =====================================================================
+        ctx.save();
+        ctx.scale(1, tilt);
 
-            // Corona rays
-            ctx.save();
-            ctx.translate(sx, sy);
-            ctx.rotate(selfRot);
-            const rayCount = 8 + s * 2;
-            for (let r = 0; r < rayCount; r++) {
-                const rayAngle = (Math.PI * 2 * r) / rayCount;
-                const rayLen = sunSize * (1.5 + Math.sin(rot * 4 + r * 1.3) * 0.5 * energy);
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(rayAngle) * sunSize * 0.8, Math.sin(rayAngle) * sunSize * 0.8);
-                ctx.lineTo(Math.cos(rayAngle) * rayLen, Math.sin(rayAngle) * rayLen);
-                ctx.strokeStyle = `hsla(${sunHue}, ${sat * 0.8}%, 75%, ${0.1 + energy * 0.15})`;
-                ctx.lineWidth = 0.8;
-                ctx.stroke();
-            }
-            ctx.restore();
+        // Outer disc shadow
+        const discShadow = ctx.createRadialGradient(0, 0, discRadius * 0.5, 0, 0, discRadius * 1.05);
+        discShadow.addColorStop(0, `hsla(${brassHue}, 40%, 8%, 0)`);
+        discShadow.addColorStop(0.85, `hsla(${brassHue}, 40%, 5%, 0.3)`);
+        discShadow.addColorStop(1, `hsla(${brassHue}, 40%, 3%, 0.6)`);
+        ctx.beginPath();
+        ctx.arc(0, 0, discRadius * 1.05, 0, Math.PI * 2);
+        ctx.fillStyle = discShadow;
+        ctx.fill();
 
-            // Glow
-            const sunGlow = ctx.createRadialGradient(sx, sy, 0, sx, sy, sunSize * 3.5);
-            sunGlow.addColorStop(0, `hsla(${sunHue}, ${sat * 0.9}%, ${80 + energy * 15}%, ${0.8 + energy * 0.2})`);
-            sunGlow.addColorStop(0.35, `hsla(${sunHue}, ${sat * 0.7}%, 60%, ${0.3 + energy * 0.2})`);
-            sunGlow.addColorStop(1, `hsla(${sunHue}, ${sat * 0.5}%, 30%, 0)`);
+        // Main disc body
+        const discGrad = ctx.createRadialGradient(
+            -discRadius * 0.2, -discRadius * 0.2, discRadius * 0.05,
+            0, 0, discRadius
+        );
+        discGrad.addColorStop(0, `hsla(${brassHue}, ${brassSat}%, 45%, 0.25)`);
+        discGrad.addColorStop(0.3, `hsla(${brassHue}, ${brassSat - 10}%, 30%, 0.20)`);
+        discGrad.addColorStop(0.7, `hsla(${brassHue}, ${brassSat - 20}%, 20%, 0.18)`);
+        discGrad.addColorStop(1, `hsla(${brassHue}, ${brassSat - 25}%, 12%, 0.15)`);
+        ctx.beginPath();
+        ctx.arc(0, 0, discRadius, 0, Math.PI * 2);
+        ctx.fillStyle = discGrad;
+        ctx.fill();
+
+        // Disc rim
+        ctx.beginPath();
+        ctx.arc(0, 0, discRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsla(${brassHue}, ${brassSat}%, 55%, 0.5)`;
+        ctx.lineWidth = thickness * 0.6;
+        ctx.stroke();
+
+        // =====================================================================
+        // 2. CONCENTRIC ORBIT TRACK RINGS
+        // =====================================================================
+        const orbitRadii = [1.3, 1.7, 2.1, 2.9, 3.6, 4.2, 4.8, 5.5];
+        for (let i = 0; i < Math.min(visiblePlanets, orbitRadii.length); i++) {
+            const trackR = orbitRadii[i] * simScale;
             ctx.beginPath();
-            ctx.arc(sx, sy, sunSize * 3.5, 0, Math.PI * 2);
-            ctx.fillStyle = sunGlow;
-            ctx.fill();
-
-            // Core
-            ctx.beginPath();
-            ctx.arc(sx, sy, sunSize, 0, Math.PI * 2);
-            ctx.fillStyle = `hsla(${sunHue}, ${sat * 0.5}%, 95%, 0.95)`;
-            ctx.fill();
+            ctx.arc(0, 0, trackR, 0, Math.PI * 2);
+            const isGiant = (i === 3 || i === 4);
+            ctx.strokeStyle = `hsla(${brassHue}, ${brassSat}%, ${isGiant ? 50 : 40}%, ${isGiant ? 0.35 : 0.20})`;
+            ctx.lineWidth = thickness * (isGiant ? 0.35 : 0.2);
+            ctx.stroke();
         }
 
-        // Energy filaments between suns
-        for (let s = 0; s < 3; s++) {
-            const ns = (s + 1) % 3;
-            const p0 = sunPositions[s];
-            const p1 = sunPositions[ns];
+        // Inner decorative rings (zodiac-style) — count driven by mirrors
+        const decoRings = Math.max(1, Math.floor(mirrors / 2));
+        for (let r = 0; r < decoRings; r++) {
+            const innerR = discRadius * (0.08 + r * (0.12 / decoRings));
             ctx.beginPath();
-            ctx.moveTo(p0.x, p0.y);
-            const cpx = (p0.x + p1.x) / 2 + Math.sin(rot * 2 + s * 2.1) * sunOrbitR * 0.4;
-            const cpy = (p0.y + p1.y) / 2 + Math.cos(rot * 2.5 + s * 1.7) * sunOrbitR * 0.4;
-            ctx.quadraticCurveTo(cpx, cpy, p1.x, p1.y);
-            ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.8}%, 70%, ${0.15 + energy * 0.3})`;
+            ctx.arc(0, 0, innerR, 0, Math.PI * 2);
+            ctx.strokeStyle = `hsla(${brassHue}, ${brassSat}%, 50%, 0.15)`;
+            ctx.lineWidth = thickness * 0.15;
+            ctx.stroke();
+        }
+
+        // Decorative tick marks on inner ring — count driven by mirrors
+        const tickR = discRadius * 0.18;
+        const tickCount = mirrors * 3;
+        for (let t = 0; t < tickCount; t++) {
+            const tAngle = (t / tickCount) * Math.PI * 2;
+            const inner = tickR * 0.8;
+            const outer = tickR;
+            if (numSides <= 4) {
+                // Simple line ticks for low numSides
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(tAngle) * inner, Math.sin(tAngle) * inner);
+                ctx.lineTo(Math.cos(tAngle) * outer, Math.sin(tAngle) * outer);
+                ctx.strokeStyle = `hsla(${brassHue}, ${brassSat}%, 50%, 0.12)`;
+                ctx.lineWidth = thickness * 0.15;
+                ctx.stroke();
+            } else {
+                // Polygon marker ticks for higher numSides
+                const mx = Math.cos(tAngle) * (inner + outer) * 0.5;
+                const my = Math.sin(tAngle) * (inner + outer) * 0.5;
+                const markerSize = (outer - inner) * 0.4;
+                ctx.beginPath();
+                for (let p = 0; p < numSides; p++) {
+                    const pa = (Math.PI * 2 * p) / numSides + tAngle;
+                    const px = mx + Math.cos(pa) * markerSize;
+                    const py = my + Math.sin(pa) * markerSize;
+                    p === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fillStyle = `hsla(${brassHue}, ${brassSat}%, 50%, 0.10)`;
+                ctx.fill();
+                ctx.strokeStyle = `hsla(${brassHue}, ${brassSat}%, 50%, 0.12)`;
+                ctx.lineWidth = thickness * 0.1;
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore(); // end disc tilt
+
+        // =====================================================================
+        // 3. Build planet rendering list with screen positions, depth-sort
+        // =====================================================================
+        const renderList = [];
+
+        // Binary stars → screen positions on disc plane
+        const sAx = starA.x * simScale;
+        const sAy = starA.y * simScale * tilt;
+        const sBx = starB.x * simScale;
+        const sBy = starB.y * simScale * tilt;
+
+        // Planets
+        for (let i = 0; i < Math.min(visiblePlanets, planets.length); i++) {
+            const p = planets[i];
+            const spec = planetSpecs[i];
+            const discX = p.x * simScale;
+            const discY = p.y * simScale * tilt; // position on disc surface
+            const bodySize = canvasBase * spec.sizeM * orbitFactor;
+            const stalkHeight = bodySize * 1.8 + 8; // how far above disc
+
+            renderList.push({
+                i, spec, p,
+                discX, discY,          // where the stalk meets the disc
+                planetX: discX,        // planet sphere X (same as disc)
+                planetY: discY - stalkHeight, // planet sphere Y (above disc)
+                bodySize,
+                stalkHeight,
+                depth: discY,          // sort by disc Y (further down = closer to viewer)
+            });
+        }
+
+        // Sort back-to-front (smaller depth first = further away drawn first)
+        renderList.sort((a, b) => a.depth - b.depth);
+
+        // =====================================================================
+        // 4. ARMATURE ARMS — brass lines from center to planet on disc
+        // =====================================================================
+        ctx.save();
+        for (const item of renderList) {
+            // Arm on disc surface
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(item.discX, item.discY);
+            ctx.strokeStyle = `hsla(${brassHue}, ${brassSat}%, 45%, 0.25)`;
+            ctx.lineWidth = thickness * 0.45;
+            ctx.stroke();
+
+            // Small brass joint at disc end
+            ctx.beginPath();
+            ctx.arc(item.discX, item.discY, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${brassHue}, ${brassSat}%, 55%, 0.5)`;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // =====================================================================
+        // 5. PLASMA BRIDGE between stars (subtle on disc plane)
+        // =====================================================================
+        for (let strand = 0; strand < 2; strand++) {
+            ctx.beginPath();
+            const segs = 16;
+            for (let s = 0; s <= segs; s++) {
+                const t = s / segs;
+                const baseX = sAx + (sBx - sAx) * t;
+                const baseY = sAy + (sBy - sAy) * t;
+                const perpX = -(sBy - sAy);
+                const perpY = (sBx - sAx);
+                const perpLen = Math.sqrt(perpX * perpX + perpY * perpY) || 1;
+                const wave = Math.sin(t * Math.PI * 3 + rot * 12 + strand * 2.5) * (2 + energy * 5);
+                const px = baseX + (perpX / perpLen) * wave * (strand - 0.5) * 0.8;
+                const py = baseY + (perpY / perpLen) * wave * (strand - 0.5) * 0.8;
+                if (s === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = `hsla(${brassHue + 15}, 80%, 75%, ${0.06 + energy * 0.15})`;
+            ctx.lineWidth = thickness * (0.25 + energy * 0.3);
+            ctx.stroke();
+        }
+
+        // =====================================================================
+        // 6. CENTRAL SUN — bright glow on the disc
+        // =====================================================================
+        const sunSize = canvasBase * 0.045 * orbitFactor * (1.0 + energy * 0.4);
+
+        // Outer corona
+        const corona = ctx.createRadialGradient(0, 0, sunSize * 0.2, 0, 0, sunSize * 4);
+        corona.addColorStop(0, `hsla(${brassHue}, 90%, 80%, 0.6)`);
+        corona.addColorStop(0.3, `hsla(${brassHue}, 80%, 60%, 0.2)`);
+        corona.addColorStop(0.6, `hsla(${brassHue}, 70%, 40%, 0.05)`);
+        corona.addColorStop(1, `hsla(${brassHue}, 60%, 30%, 0)`);
+        ctx.beginPath();
+        ctx.arc(0, 0, sunSize * 4, 0, Math.PI * 2);
+        ctx.fillStyle = corona;
+        ctx.fill();
+
+        // Sun flare spikes
+        const flareCount = Math.floor(4 + density * 6);
+        if (energy > 0.15) {
+            for (let f = 0; f < flareCount; f++) {
+                const fAngle = (f / flareCount) * Math.PI * 2 + rot * 3;
+                const flareLen = sunSize * (1.5 + energy * 3.0) * (0.6 + this.seededRandom(seed + f * 47) * 0.8);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(fAngle) * flareLen, Math.sin(fAngle) * flareLen);
+                ctx.strokeStyle = `hsla(${brassHue}, 100%, 85%, ${energy * 0.35})`;
+                ctx.lineWidth = thickness * (0.45 + energy * 0.3);
+                ctx.stroke();
+            }
+        }
+
+        // Sun core — white-hot center
+        const sunCore = ctx.createRadialGradient(
+            -sunSize * 0.15, -sunSize * 0.15, sunSize * 0.05,
+            0, 0, sunSize
+        );
+        sunCore.addColorStop(0, `hsla(${brassHue}, 30%, 100%, 1)`);
+        sunCore.addColorStop(0.3, `hsla(${brassHue}, 70%, 90%, 0.95)`);
+        sunCore.addColorStop(0.7, `hsla(${brassHue}, 90%, 65%, 0.85)`);
+        sunCore.addColorStop(1, `hsla(${brassHue + 10}, 100%, 50%, 0.6)`);
+        ctx.beginPath();
+        ctx.arc(0, 0, sunSize, 0, Math.PI * 2);
+        ctx.fillStyle = sunCore;
+        ctx.fill();
+
+        // Secondary star as subtle glow offset
+        const sBSize = sunSize * 0.5;
+        const sBGlow = ctx.createRadialGradient(sBx, sBy, sBSize * 0.1, sBx, sBy, sBSize * 2);
+        sBGlow.addColorStop(0, `hsla(210, 60%, 85%, 0.5)`);
+        sBGlow.addColorStop(0.5, `hsla(210, 50%, 70%, 0.15)`);
+        sBGlow.addColorStop(1, `hsla(210, 40%, 60%, 0)`);
+        ctx.beginPath();
+        ctx.arc(sBx, sBy, sBSize * 2, 0, Math.PI * 2);
+        ctx.fillStyle = sBGlow;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(sBx, sBy, sBSize, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(210, 50%, 95%, 0.7)`;
+        ctx.fill();
+
+        // =====================================================================
+        // 7. RENDER PLANETS (back-to-front with stalks)
+        // =====================================================================
+        for (const item of renderList) {
+            const { i, spec, discX, discY, planetX, planetY, bodySize } = item;
+            const selfSpin = rot * (3.0 - i * 0.3);
+            const [pH, pS, pL] = spec.color;
+
+            // --- Stalk (vertical brass rod from disc to planet) ---
+            ctx.beginPath();
+            ctx.moveTo(discX, discY);
+            ctx.lineTo(planetX, planetY);
+            ctx.strokeStyle = `hsla(${brassHue}, ${brassSat}%, 50%, 0.6)`;
+            ctx.lineWidth = thickness * 0.45;
+            ctx.stroke();
+
+            // Stalk top joint
+            ctx.beginPath();
+            ctx.arc(planetX, planetY + bodySize + 1, 2, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${brassHue}, ${brassSat}%, 55%, 0.5)`;
+            ctx.fill();
+
+            // --- Planet shadow on disc ---
+            ctx.save();
+            ctx.scale(1, tilt * 0.5);
+            ctx.beginPath();
+            ctx.arc(discX, discY / (tilt * 0.5), bodySize * 0.7, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(0, 0%, 0%, 0.12)`;
+            ctx.fill();
+            ctx.restore();
+
+            // --- Planet sphere ---
+            const pGrad = ctx.createRadialGradient(
+                planetX - bodySize * 0.3, planetY - bodySize * 0.3, bodySize * 0.05,
+                planetX, planetY, bodySize
+            );
+            pGrad.addColorStop(0, `hsla(${pH}, ${pS}%, ${pL + 20}%, 0.95)`);
+            pGrad.addColorStop(0.5, `hsla(${pH}, ${pS}%, ${pL}%, 0.90)`);
+            pGrad.addColorStop(1, `hsla(${pH}, ${pS - 10}%, ${pL - 15}%, 0.85)`);
+            ctx.beginPath();
+            ctx.arc(planetX, planetY, bodySize, 0, Math.PI * 2);
+            ctx.fillStyle = pGrad;
+            ctx.fill();
+
+            // --- Planet-specific details ---
+
+            // COLOSSUS (i=3): atmospheric bands + storm eye
+            if (i === 3) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(planetX, planetY, bodySize * 0.96, 0, Math.PI * 2);
+                ctx.clip();
+                for (let b = 0; b < 6; b++) {
+                    const bandY = planetY - bodySize + (b + 0.5) * (bodySize * 2 / 6);
+                    ctx.beginPath();
+                    ctx.rect(planetX - bodySize, bandY, bodySize * 2, bodySize * 2 / 8);
+                    ctx.fillStyle = `hsla(${25 + b * 5}, 50%, ${50 + b * 4}%, 0.15)`;
+                    ctx.fill();
+                }
+                // Storm eye
+                const stormPulse = 1.0 + energy * 0.3;
+                ctx.beginPath();
+                ctx.ellipse(
+                    planetX + bodySize * 0.2, planetY + bodySize * 0.15,
+                    bodySize * 0.2 * stormPulse, bodySize * 0.12 * stormPulse,
+                    0.1, 0, Math.PI * 2
+                );
+                ctx.fillStyle = `hsla(10, 80%, 45%, 0.5)`;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // TERRA (i=1): cloud wisps
+            if (i === 1) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(planetX, planetY, bodySize * 0.93, 0, Math.PI * 2);
+                ctx.clip();
+                for (let cw = 0; cw < 3; cw++) {
+                    const cwAngle = selfSpin * 0.05 + cw * 1.8 + this.seededRandom(seed + cw * 61) * 2;
+                    ctx.beginPath();
+                    ctx.arc(
+                        planetX + Math.cos(cwAngle) * bodySize * 0.25,
+                        planetY + Math.sin(cwAngle) * bodySize * 0.25,
+                        bodySize * 0.35, cwAngle, cwAngle + 1.0
+                    );
+                    ctx.strokeStyle = `hsla(0, 0%, 100%, 0.2)`;
+                    ctx.lineWidth = bodySize * 0.12;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // ARIDUS (i=2): polar cap
+            if (i === 2) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(planetX, planetY, bodySize * 0.93, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.beginPath();
+                ctx.arc(planetX, planetY - bodySize * 0.65, bodySize * 0.45, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(0, 0%, 95%, 0.3)`;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // VULCAN (i=0): lava cracks
+            if (i === 0) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(planetX, planetY, bodySize * 0.93, 0, Math.PI * 2);
+                ctx.clip();
+                for (let c = 0; c < 4; c++) {
+                    const cAngle = this.seededRandom(seed + c * 83) * Math.PI * 2 + selfSpin * 0.1;
+                    const cLen = bodySize * (0.4 + this.seededRandom(seed + c * 97) * 0.4);
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        planetX + Math.cos(cAngle) * bodySize * 0.15,
+                        planetY + Math.sin(cAngle) * bodySize * 0.15
+                    );
+                    ctx.lineTo(
+                        planetX + Math.cos(cAngle + 0.3) * cLen,
+                        planetY + Math.sin(cAngle + 0.3) * cLen
+                    );
+                    ctx.strokeStyle = `hsla(15, 100%, 55%, ${0.15 + energy * 0.25})`;
+                    ctx.lineWidth = 0.8 + energy * 0.5;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // TEMPEST (i=6): dark spot
+            if (i === 6) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(planetX, planetY, bodySize * 0.93, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.beginPath();
+                ctx.ellipse(
+                    planetX + bodySize * 0.15, planetY - bodySize * 0.1,
+                    bodySize * 0.15, bodySize * 0.08, 0.2, 0, Math.PI * 2
+                );
+                ctx.fillStyle = `hsla(240, 40%, 15%, 0.35)`;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // --- Rings (AURELIAN i=4, GLACIUS i=5) ---
+            if (spec.ring) {
+                const ringScale = i === 4 ? 0.25 : 0.12;
+                const ringWidth = i === 4 ? bodySize * 0.15 : bodySize * 0.06;
+                const ringOuterR = bodySize * (i === 4 ? 1.8 : 1.4);
+
+                // Back half
+                ctx.save();
+                ctx.translate(planetX, planetY);
+                ctx.scale(1, ringScale);
+                ctx.beginPath();
+                ctx.arc(0, 0, ringOuterR, 0, Math.PI);
+                ctx.strokeStyle = i === 4
+                    ? `hsla(42, 55%, 65%, 0.35)`
+                    : `hsla(180, 40%, 60%, 0.20)`;
+                ctx.lineWidth = ringWidth;
+                ctx.stroke();
+                if (i === 4) {
+                    // Cassini gap
+                    ctx.beginPath();
+                    ctx.arc(0, 0, ringOuterR * 0.85, 0, Math.PI);
+                    ctx.strokeStyle = `hsla(0, 0%, 0%, 0.12)`;
+                    ctx.lineWidth = ringWidth * 0.2;
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // Front half (draw after planet for proper overlap)
+                ctx.save();
+                ctx.translate(planetX, planetY);
+                ctx.scale(1, ringScale);
+                ctx.beginPath();
+                ctx.arc(0, 0, ringOuterR, Math.PI, Math.PI * 2);
+                ctx.strokeStyle = i === 4
+                    ? `hsla(42, 55%, 65%, 0.35)`
+                    : `hsla(180, 40%, 60%, 0.20)`;
+                ctx.lineWidth = ringWidth;
+                ctx.stroke();
+                if (i === 4) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, ringOuterR * 0.85, Math.PI, Math.PI * 2);
+                    ctx.strokeStyle = `hsla(0, 0%, 0%, 0.12)`;
+                    ctx.lineWidth = ringWidth * 0.2;
+                    ctx.stroke();
+                    // Ring sparkle on beats
+                    if (energy > 0.3) {
+                        for (let sp = 0; sp < Math.floor(3 + density * 8); sp++) {
+                            const spAngle = this.seededRandom(seed + sp * 43 + 4000) * Math.PI * 2;
+                            const spR = ringOuterR * (0.75 + this.seededRandom(seed + sp * 67 + 4000) * 0.3);
+                            ctx.beginPath();
+                            ctx.arc(Math.cos(spAngle + rot * 2) * spR, Math.sin(spAngle + rot * 2) * spR, 0.8 + energy, 0, Math.PI * 2);
+                            ctx.fillStyle = `hsla(50, 80%, 90%, ${energy * 0.5})`;
+                            ctx.fill();
+                        }
+                    }
+                }
+                ctx.restore();
+            }
+
+            // --- Moons (small dots orbiting planet) ---
+            const moonCounts = [0, 1, 0, 3, 2, 1, 1, 0];
+            const moonCount = Math.min(moonCounts[i], Math.ceil(density * moonCounts[i]));
+            for (let mi = 0; mi < moonCount; mi++) {
+                const mOrbit = bodySize * (1.8 + mi * 0.7);
+                const mAngle = rot * (4 - mi * 0.8) + this.seededRandom(seed + i * 1000 + mi) * Math.PI * 2;
+                const mX = planetX + Math.cos(mAngle) * mOrbit;
+                const mY = planetY + Math.sin(mAngle) * mOrbit * 0.5; // flattened orbit
+                const mSize = bodySize * 0.15;
+                const mGrad = ctx.createRadialGradient(
+                    mX - mSize * 0.3, mY - mSize * 0.3, mSize * 0.1,
+                    mX, mY, mSize
+                );
+                mGrad.addColorStop(0, `hsla(0, 5%, 75%, 0.85)`);
+                mGrad.addColorStop(1, `hsla(0, 5%, 50%, 0.6)`);
+                ctx.beginPath();
+                ctx.arc(mX, mY, mSize, 0, Math.PI * 2);
+                ctx.fillStyle = mGrad;
+                ctx.fill();
+            }
+        }
+
+        // =====================================================================
+        // 8. ASTEROID BELT (density > 0.8)
+        // =====================================================================
+        if (density > 0.8) {
+            const beltSimR = 2.5; // between Aridus and Colossus
+            const asteroidCount = Math.floor((density - 0.8) * 50);
+            for (let a = 0; a < asteroidCount; a++) {
+                const aPhase = this.seededRandom(seed + a * 173 + 8000) * Math.PI * 2;
+                const aSpeed = 0.3 + this.seededRandom(seed + a * 211 + 8001) * 0.15;
+                const aR = beltSimR * simScale * (0.9 + this.seededRandom(seed + a * 97 + 8002) * 0.2);
+                const aAngle = aPhase + rot * aSpeed;
+                const ax = Math.cos(aAngle) * aR;
+                const ay = Math.sin(aAngle) * aR * tilt; // on disc plane
+                const aSize = 0.4 + this.seededRandom(seed + a * 53 + 8003) * 1.0;
+                ctx.beginPath();
+                ctx.arc(ax, ay, aSize, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${brassHue}, 25%, 50%, 0.25)`;
+                ctx.fill();
+            }
+        }
+
+        // =====================================================================
+        // 9. BASS SHOCKWAVE RINGS
+        // =====================================================================
+        if (energy > 0.5) {
+            const shockCycle = (rot * 8) % (Math.PI * 2);
+            const frac = shockCycle / (Math.PI * 2);
+            const shockR = frac * discRadius * 0.7;
+            const shockAlpha = (1 - frac) * energy * 0.25;
+            ctx.save();
+            ctx.scale(1, tilt);
+            ctx.beginPath();
+            ctx.arc(0, 0, shockR, 0, Math.PI * 2);
+            ctx.strokeStyle = `hsla(${brassHue}, 80%, 75%, ${shockAlpha})`;
+            ctx.lineWidth = thickness * (0.6 * (1 - frac) + 0.15);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // =====================================================================
+        // 10. WANDERER'S COMET TAIL (if visible)
+        // =====================================================================
+        if (visiblePlanets >= 8) {
+            const wp = planets[7];
+            const wpx = wp.x * simScale;
+            const wpy = wp.y * simScale * tilt;
+            const wStalk = canvasBase * 0.010 * orbitFactor * 1.8 + 8;
+            const wpPlanetY = wpy - wStalk;
+            const awayAngle = Math.atan2(wpy, wpx);
+            const tailLen = canvasBase * 0.010 * orbitFactor * 4;
+            ctx.beginPath();
+            ctx.moveTo(wpx, wpPlanetY);
+            ctx.quadraticCurveTo(
+                wpx + Math.cos(awayAngle) * tailLen * 0.5 + Math.sin(rot * 5) * 3,
+                wpPlanetY + Math.sin(awayAngle) * tailLen * 0.3,
+                wpx + Math.cos(awayAngle) * tailLen,
+                wpPlanetY + Math.sin(awayAngle) * tailLen * 0.2
+            );
+            ctx.strokeStyle = `hsla(200, 40%, 80%, 0.10)`;
             ctx.lineWidth = thickness * 0.35;
             ctx.stroke();
         }
-
-        // === ORBITING CELESTIAL BODIES — true orrery motion ===
-        // Bodies orbit the center at Kepler-like speeds: inner = faster.
-        // Each body has its own orbital ring, eccentricity, and tilt.
-        // Armatures physically connect hub to each body and track them.
-        // Everything is then mirrored by the kaleidoscope.
-        const bodyCount = 3 + Math.floor(this.seededRandom(seed + 77) * 2);
-        const segAngle = Math.PI / mirrors;
-
-        for (let p = 0; p < bodyCount; p++) {
-            const pSeed = seed + p * 37;
-            const bodyType = Math.floor(this.seededRandom(pSeed + 99) * 6);
-
-            // Orbital parameters — each body unique
-            const orbitRadiusBase = radius * (0.15 + p * 0.13 + this.seededRandom(pSeed + 8) * 0.04) * orbitFactor;
-            const eccentricity = 0.05 + this.seededRandom(pSeed + 9) * 0.25;
-            // Kepler: orbital speed inversely proportional to radius^1.5
-            const keplerSpeed = 0.8 / Math.pow((0.15 + p * 0.13), 1.1);
-            const orbitDir = this.seededRandom(pSeed + 10) > 0.15 ? 1 : -1; // most prograde, some retrograde
-            // Orbital tilt (precession) — slow wobble of the orbit plane
-            const tiltAmp = 0.03 + this.seededRandom(pSeed + 11) * 0.06;
-            const tiltSpeed = 0.1 + this.seededRandom(pSeed + 12) * 0.15;
-            // Starting phase
-            const phaseOffset = this.seededRandom(pSeed + 13) * Math.PI * 2;
-
-            // Current orbital angle — this is what makes them ORBIT
-            const orbitalAngle = rot * keplerSpeed * orbitDir + phaseOffset;
-            // Elliptical radius at current angle
-            const orbitR = orbitRadiusBase * (1 - eccentricity * Math.cos(orbitalAngle * 2));
-            // Slingshot from bass
-            const slingshot = energy * radius * 0.04 * orbitFactor;
-            const currentR = orbitR + slingshot;
-            // Precession tilt applied as slight angle offset
-            const tiltOffset = Math.sin(rot * tiltSpeed + p * 2) * tiltAmp;
-            const currentAngle = orbitalAngle + tiltOffset;
-
-            // Body position in absolute coords (before mirroring)
-            const px = Math.cos(currentAngle) * currentR;
-            const py = Math.sin(currentAngle) * currentR;
-
-            const bodySize = radius * (0.03 + this.seededRandom(pSeed + 1) * 0.035) * orbitFactor;
-            const bodyHue = (brassHue + this.seededRandom(pSeed + 2) * 70 - 10) % 360;
-            const selfSpin = rot * (0.5 + this.seededRandom(pSeed + 3) * 2) * (this.seededRandom(pSeed + 4) > 0.5 ? 1 : -1);
-
-            // --- Orbital path (etched trail) — full ellipse ---
-            ctx.beginPath();
-            const orbitSteps = 60;
-            for (let os = 0; os <= orbitSteps; os++) {
-                const oa = (Math.PI * 2 * os) / orbitSteps;
-                const oR = orbitRadiusBase * (1 - eccentricity * Math.cos(oa * 2));
-                const ox = Math.cos(oa) * oR;
-                const oy = Math.sin(oa) * oR;
-                os === 0 ? ctx.moveTo(ox, oy) : ctx.lineTo(ox, oy);
-            }
-            ctx.closePath();
-            ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.25}%, 40%, ${0.04 + brightness * 0.04})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-
-            // --- Phosphor trail behind body (recent path glows) ---
-            ctx.beginPath();
-            const trailLength = 0.6; // radians of trail
-            const trailSteps = 15;
-            for (let ts = 0; ts <= trailSteps; ts++) {
-                const ta = currentAngle - trailLength * (ts / trailSteps);
-                const tR = orbitRadiusBase * (1 - eccentricity * Math.cos((orbitalAngle - trailLength * (ts / trailSteps)) * 2)) + slingshot;
-                const tx = Math.cos(ta) * tR;
-                const ty = Math.sin(ta) * tR;
-                ts === 0 ? ctx.moveTo(tx, ty) : ctx.lineTo(tx, ty);
-            }
-            ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 55%, ${0.08 + brightness * 0.06})`;
-            ctx.lineWidth = bodySize * 0.4;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // --- Body rendering (self-rotating) ---
-            ctx.save();
-            ctx.translate(px, py);
-            ctx.rotate(selfSpin);
-
-            if (bodyType === 0) {
-                // ARMILLARY: tilted concentric rings
-                const ringCount = 2 + Math.floor(this.seededRandom(pSeed + 10) * 2);
-                for (let r = 0; r < ringCount; r++) {
-                    const ringR = bodySize * (0.7 + r * 0.35);
-                    const tilt = r * 1.1 + this.seededRandom(pSeed + r + 20) * 0.8;
-                    ctx.save();
-                    ctx.rotate(tilt);
-                    ctx.scale(1, 0.35 + r * 0.12);
-                    ctx.beginPath();
-                    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
-                    ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.6}%, ${50 + brightness * 20}%, ${0.4 + energy * 0.3})`;
-                    ctx.lineWidth = thickness * 0.3;
-                    ctx.stroke();
-                    ctx.restore();
-                }
-                ctx.beginPath();
-                ctx.arc(0, 0, bodySize * 0.25, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.5}%, 80%, 0.8)`;
-                ctx.fill();
-
-            } else if (bodyType === 1) {
-                // RINGED PLANET (Saturn-like)
-                ctx.beginPath();
-                ctx.arc(0, 0, bodySize * 0.45, 0, Math.PI * 2);
-                const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, bodySize * 0.45);
-                grad.addColorStop(0, `hsla(${bodyHue}, ${sat * 0.5}%, 70%, 0.9)`);
-                grad.addColorStop(1, `hsla(${bodyHue}, ${sat * 0.6}%, 40%, 0.6)`);
-                ctx.fillStyle = grad;
-                ctx.fill();
-                ctx.save();
-                ctx.scale(1, 0.3);
-                ctx.beginPath();
-                ctx.arc(0, 0, bodySize * 1.1, 0, Math.PI * 2);
-                ctx.strokeStyle = `hsla(${(bodyHue + 20) % 360}, ${sat * 0.5}%, 60%, ${0.5 + energy * 0.3})`;
-                ctx.lineWidth = bodySize * 0.12;
-                ctx.stroke();
-                ctx.restore();
-
-            } else if (bodyType === 2) {
-                // CRESCENT MOON
-                ctx.beginPath();
-                ctx.arc(0, 0, bodySize * 0.5, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 65%, ${0.5 + brightness * 0.3})`;
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(bodySize * 0.2, -bodySize * 0.1, bodySize * 0.42, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(0, 0%, 5%, 0.7)`;
-                ctx.fill();
-
-            } else if (bodyType === 3) {
-                // GEAR COG
-                const teeth = 6 + Math.floor(this.seededRandom(pSeed + 15) * 6);
-                const innerR = bodySize * 0.5;
-                const outerR = bodySize * 0.75;
-                ctx.beginPath();
-                for (let t = 0; t <= teeth; t++) {
-                    const a = (Math.PI * 2 * t) / teeth;
-                    const r1 = (t % 2 === 0) ? outerR : innerR;
-                    ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
-                }
-                ctx.closePath();
-                ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.6}%, ${50 + energy * 20}%, ${0.5 + harmonic * 0.3})`;
-                ctx.lineWidth = thickness * 0.35;
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(0, 0, bodySize * 0.15, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.4}%, 60%, 0.7)`;
-                ctx.fill();
-                for (let sp = 0; sp < 3; sp++) {
-                    const spA = (Math.PI * 2 * sp) / 3;
-                    ctx.beginPath();
-                    ctx.moveTo(Math.cos(spA) * bodySize * 0.15, Math.sin(spA) * bodySize * 0.15);
-                    ctx.lineTo(Math.cos(spA) * innerR * 0.9, Math.sin(spA) * innerR * 0.9);
-                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, 50%, 0.4)`;
-                    ctx.lineWidth = thickness * 0.25;
-                    ctx.stroke();
-                }
-
-            } else if (bodyType === 4) {
-                // ASTEROID CLUSTER
-                const rockCount = 4 + Math.floor(this.seededRandom(pSeed + 20) * 4);
-                for (let rk = 0; rk < rockCount; rk++) {
-                    const rkSeed = pSeed + 200 + rk * 7;
-                    const rkDist = this.seededRandom(rkSeed) * bodySize * 0.7;
-                    const rkAngle = this.seededRandom(rkSeed + 1) * Math.PI * 2;
-                    const rkSize = bodySize * (0.08 + this.seededRandom(rkSeed + 2) * 0.15);
-                    const rkX = Math.cos(rkAngle) * rkDist;
-                    const rkY = Math.sin(rkAngle) * rkDist;
-                    const rkSides = 4 + Math.floor(this.seededRandom(rkSeed + 3) * 3);
-                    ctx.beginPath();
-                    for (let v = 0; v < rkSides; v++) {
-                        const va = (Math.PI * 2 * v) / rkSides;
-                        const vr = rkSize * (0.6 + this.seededRandom(rkSeed + 10 + v) * 0.5);
-                        ctx.lineTo(rkX + Math.cos(va) * vr, rkY + Math.sin(va) * vr);
-                    }
-                    ctx.closePath();
-                    ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.3}%, ${30 + brightness * 15}%, ${0.4 + energy * 0.2})`;
-                    ctx.fill();
-                    ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, ${45 + brightness * 15}%, ${0.3 + energy * 0.2})`;
-                    ctx.lineWidth = 0.5;
-                    ctx.stroke();
-                }
-
-            } else {
-                // COMET
-                const headGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bodySize * 0.4);
-                headGrad.addColorStop(0, `hsla(${(bodyHue + 40) % 360}, ${sat * 0.7}%, 85%, 0.9)`);
-                headGrad.addColorStop(1, `hsla(${(bodyHue + 40) % 360}, ${sat * 0.5}%, 50%, 0)`);
-                ctx.beginPath();
-                ctx.arc(0, 0, bodySize * 0.4, 0, Math.PI * 2);
-                ctx.fillStyle = headGrad;
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(0, 0, bodySize * 0.15, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(0, 0%, 95%, 0.9)`;
-                ctx.fill();
-                const tailLen = bodySize * (2 + energy * 1.5);
-                for (let t = 0; t < 2; t++) {
-                    const spread = (t - 0.5) * bodySize * 0.4;
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.quadraticCurveTo(-tailLen * 0.4, spread * 2, -tailLen, spread * 3);
-                    ctx.strokeStyle = `hsla(${(bodyHue + 40) % 360}, ${sat * 0.6}%, 65%, ${0.2 + energy * 0.15})`;
-                    ctx.lineWidth = bodySize * (0.06 - t * 0.02);
-                    ctx.stroke();
-                }
-            }
-
-            ctx.restore(); // end body self-rotation
-
-            // --- Epicycle moons orbiting this body ---
-            if (bodyType < 4) {
-                const moonCount = 1 + Math.floor(this.seededRandom(pSeed + 5) * 2);
-                for (let mn = 0; mn < moonCount; mn++) {
-                    const moonSeed = pSeed + 100 + mn * 11;
-                    const moonOrbit = bodySize * (1.4 + mn * 0.8);
-                    // Moons orbit their planet (not the center)
-                    const moonSpeed = 2 + this.seededRandom(moonSeed) * 3;
-                    const moonDir = this.seededRandom(moonSeed + 2) > 0.3 ? 1 : -1;
-                    const moonAngle = rot * moonSpeed * moonDir + this.seededRandom(moonSeed + 1) * Math.PI * 2;
-                    const moonEcc = this.seededRandom(moonSeed + 3) * 0.2;
-                    const moonR = moonOrbit * (1 - moonEcc * Math.cos(moonAngle));
-                    const moX = px + Math.cos(moonAngle) * moonR;
-                    const moY = py + Math.sin(moonAngle) * moonR;
-                    const moonSize = bodySize * (0.12 + this.seededRandom(moonSeed + 4) * 0.08);
-
-                    // Moon orbit ring
-                    ctx.beginPath();
-                    ctx.arc(px, py, moonOrbit, 0, Math.PI * 2);
-                    ctx.strokeStyle = `hsla(${bodyHue}, ${sat * 0.2}%, 40%, ${0.05 + harmonic * 0.06})`;
-                    ctx.lineWidth = 0.4;
-                    ctx.stroke();
-
-                    // Moon body
-                    ctx.beginPath();
-                    ctx.arc(moX, moY, moonSize, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.4}%, 70%, ${0.5 + energy * 0.3})`;
-                    ctx.fill();
-
-                    // Sub-moon (epicycle of epicycle) for some moons
-                    if (this.seededRandom(moonSeed + 5) > 0.5) {
-                        const subOrbit = moonSize * 3;
-                        const subAngle = rot * (moonSpeed * 2.5) * -moonDir + this.seededRandom(moonSeed + 6) * Math.PI * 2;
-                        const subX = moX + Math.cos(subAngle) * subOrbit;
-                        const subY = moY + Math.sin(subAngle) * subOrbit;
-                        ctx.beginPath();
-                        ctx.arc(subX, subY, moonSize * 0.5, 0, Math.PI * 2);
-                        ctx.fillStyle = `hsla(${bodyHue}, ${sat * 0.35}%, 65%, ${0.4 + energy * 0.2})`;
-                        ctx.fill();
-                    }
-                }
-            }
-        }
-
-        // === THE TICKING HAND — gear-shift motion (snaps to discrete positions) ===
-        // Quantize to tick positions for mechanical feel
-        const ticksPerRev = mirrors * 4;
-        const continuousAngle = rot * 0.8;
-        const tickAngle = Math.floor(continuousAngle * ticksPerRev / (Math.PI * 2)) * (Math.PI * 2) / ticksPerRev;
-        const handLen = radius * 0.65 * orbitFactor;
-
-        ctx.save();
-        ctx.rotate(tickAngle);
-
-        // Needle with taper
-        ctx.beginPath();
-        ctx.moveTo(0, thickness * 0.3);
-        ctx.lineTo(handLen, 0);
-        ctx.lineTo(0, -thickness * 0.3);
-        ctx.closePath();
-        ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.6}%, ${55 + energy * 25}%, ${0.5 + energy * 0.4})`;
-        ctx.fill();
-
-        // Tip spark on beats
-        if (energy > 0.4) {
-            const tipGrad = ctx.createRadialGradient(handLen, 0, 0, handLen, 0, radius * 0.06);
-            tipGrad.addColorStop(0, `hsla(${brassHue}, ${sat}%, 92%, ${energy * 0.9})`);
-            tipGrad.addColorStop(1, `hsla(${brassHue}, ${sat}%, 60%, 0)`);
-            ctx.beginPath();
-            ctx.arc(handLen, 0, radius * 0.06, 0, Math.PI * 2);
-            ctx.fillStyle = tipGrad;
-            ctx.fill();
-        }
-        ctx.restore();
-
-        // Pivot hub with inner gear
-        const hubSize = radius * 0.035;
-        ctx.save();
-        ctx.rotate(-rot * 0.5); // counter-rotate hub gear
-        const hubTeeth = 10;
-        ctx.beginPath();
-        for (let t = 0; t <= hubTeeth * 2; t++) {
-            const a = (Math.PI * 2 * t) / (hubTeeth * 2);
-            const r = (t % 2 === 0) ? hubSize * 1.3 : hubSize;
-            const x = Math.cos(a) * r;
-            const y = Math.sin(a) * r;
-            t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.5}%, 55%, 0.5)`;
-        ctx.lineWidth = thickness * 0.3;
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.beginPath();
-        ctx.arc(0, 0, hubSize * 0.5, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${brassHue}, ${sat * 0.5}%, 75%, 0.9)`;
-        ctx.fill();
-
-        // === Logarithmic spiral mirror overlay ===
-        const spiralArms = mirrors;
-        for (let s = 0; s < spiralArms; s++) {
-            const armOffset = (Math.PI * 2 * s) / spiralArms;
-            ctx.beginPath();
-            for (let st = 0; st < 40; st++) {
-                const t = st / 40;
-                const theta = t * Math.PI * 1.5 + armOffset + rot * 0.1;
-                const r = radius * 0.05 * Math.exp(t * 2.2) * orbitFactor;
-                if (r > radius * 0.8 * orbitFactor) break;
-                const x = Math.cos(theta) * r;
-                const y = Math.sin(theta) * r;
-                st === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-            }
-            ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.3}%, 45%, ${0.06 + brightness * 0.06})`;
-            ctx.lineWidth = thickness * 0.2;
-            ctx.stroke();
-        }
-
-        // === Outer gear ring (rotates slowly) ===
-        ctx.save();
-        ctx.rotate(rot * 0.15);
-        const gearRadius = radius * 0.7 * orbitFactor;
-        const toothCount = mirrors * 4;
-        const toothDepth = radius * 0.015;
-        ctx.beginPath();
-        for (let t = 0; t <= toothCount; t++) {
-            const angle = (Math.PI * 2 * t) / toothCount;
-            const isOuter = t % 2 === 0;
-            const r = gearRadius + (isOuter ? toothDepth : -toothDepth);
-            ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-        }
-        ctx.closePath();
-        ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.5}%, ${42 + harmonic * 15}%, ${0.18 + harmonic * 0.15})`;
-        ctx.lineWidth = thickness * 0.35;
-        ctx.stroke();
-        ctx.restore();
-
-        // === Inner counter-rotating gear ring ===
-        ctx.save();
-        ctx.rotate(-rot * 0.25);
-        const innerGearR = radius * 0.35 * orbitFactor;
-        const innerTeeth = Math.max(8, mirrors * 2);
-        const innerDepth = radius * 0.01;
-        ctx.beginPath();
-        for (let t = 0; t <= innerTeeth; t++) {
-            const angle = (Math.PI * 2 * t) / innerTeeth;
-            const isOuter = t % 2 === 0;
-            const r = innerGearR + (isOuter ? innerDepth : -innerDepth);
-            ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-        }
-        ctx.closePath();
-        ctx.strokeStyle = `hsla(${brassHue}, ${sat * 0.4}%, ${40 + harmonic * 10}%, ${0.12 + harmonic * 0.1})`;
-        ctx.lineWidth = thickness * 0.25;
-        ctx.stroke();
-        ctx.restore();
 
         ctx.restore();
     }
@@ -5502,7 +6005,12 @@ class KaleidoscopeStudio {
 
         const cherenkovHue = 210;
         const colorChargePhase = rot * 0.5;
-        const qHues = [0, 120, 240]; // R, G, B color charges
+        // Quark count driven by numSides (3-8), with evenly-spaced color charges
+        const quarkCount = Math.max(3, Math.min(8, numSides));
+        const qHues = [];
+        for (let qi = 0; qi < quarkCount; qi++) {
+            qHues.push((qi * 360 / quarkCount) % 360);
+        }
         const fieldExtent = radius * 0.7 * orbitFactor;
 
         ctx.save();
@@ -5571,8 +6079,8 @@ class KaleidoscopeStudio {
         // =====================================================
         const quarkOrbit = radius * 0.09 * orbitFactor * (0.7 + energy * 0.5);
         const quarkPositions = [];
-        for (let q = 0; q < 3; q++) {
-            const phase = (Math.PI * 2 * q) / 3;
+        for (let q = 0; q < quarkCount; q++) {
+            const phase = (Math.PI * 2 * q) / quarkCount;
             const vibrate = Math.sin(rot * 3 + phase * 2) * quarkOrbit * 0.25 * harmonic;
             const jitter = Math.sin(rot * 11 + q * 5) * quarkOrbit * 0.05;
             const qx = Math.cos(phase + rot * 0.4) * (quarkOrbit + vibrate + jitter);
@@ -5581,10 +6089,10 @@ class KaleidoscopeStudio {
         }
 
         // Strong field flux tubes — thick, glowing confined tubes between quarks
-        for (let q = 0; q < 3; q++) {
+        for (let q = 0; q < quarkCount; q++) {
             const p0 = quarkPositions[q];
-            const p1 = quarkPositions[(q + 1) % 3];
-            const chargeIdx = (q + Math.floor(colorChargePhase)) % 3;
+            const p1 = quarkPositions[(q + 1) % quarkCount];
+            const chargeIdx = (q + Math.floor(colorChargePhase)) % quarkCount;
             const tubeHue = qHues[chargeIdx];
             const dx = p1.x - p0.x;
             const dy = p1.y - p0.y;
@@ -5628,7 +6136,7 @@ class KaleidoscopeStudio {
                     const wave = Math.sin(t * Math.PI * 5 + rot * 3.5 + strand * Math.PI) * tubeWidth * 0.5 * dir;
                     ctx.lineTo(mx + perpX * wave, my + perpY * wave);
                 }
-                const nextChargeIdx = ((q + 1) + Math.floor(colorChargePhase)) % 3;
+                const nextChargeIdx = ((q + 1) + Math.floor(colorChargePhase)) % quarkCount;
                 const strandHue = strand === 0 ? tubeHue : qHues[nextChargeIdx];
                 ctx.strokeStyle = `hsla(${strandHue}, ${sat * 0.8}%, 60%, ${0.2 + energy * 0.3})`;
                 ctx.lineWidth = thickness * 0.3;
@@ -5651,15 +6159,15 @@ class KaleidoscopeStudio {
         }
 
         // === QUARK CORES — with superposition echoes ===
-        for (let q = 0; q < 3; q++) {
+        for (let q = 0; q < quarkCount; q++) {
             const { x: qx, y: qy } = quarkPositions[q];
             const qSize = radius * 0.025 * orbitFactor * (0.8 + energy * 0.3);
-            const chargeIdx = (q + Math.floor(colorChargePhase)) % 3;
+            const chargeIdx = (q + Math.floor(colorChargePhase)) % quarkCount;
             const qHue = qHues[chargeIdx];
 
             // Superposition echoes
             for (let echo = 3; echo >= 1; echo--) {
-                const phase = (Math.PI * 2 * q) / 3;
+                const phase = (Math.PI * 2 * q) / quarkCount;
                 const echoRot = rot * 0.4 - echo * 0.18;
                 const echoVib = Math.sin((rot - echo * 0.35) * 3 + phase * 2) * quarkOrbit * 0.25 * harmonic;
                 const ex = Math.cos(phase + echoRot) * (quarkOrbit + echoVib);
@@ -5689,7 +6197,7 @@ class KaleidoscopeStudio {
         }
 
         // White-light core when color charges balance
-        const coreBalance = Math.abs(Math.sin(colorChargePhase * Math.PI / 1.5));
+        const coreBalance = Math.abs(Math.sin(colorChargePhase * Math.PI / (quarkCount / 2)));
         if (coreBalance > 0.8) {
             const whiteGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, quarkOrbit * 0.7);
             whiteGrad.addColorStop(0, `hsla(0, 0%, 100%, ${(coreBalance - 0.8) * 3})`);
