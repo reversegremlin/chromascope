@@ -47,7 +47,7 @@ Built-in visualizer with **twelve distinct styles**, each mapping audio features
 | **Sacred Geometry** | Mandala-style tiling, aperiodic patterns, and temple-like symmetry locks | ![Sacred Geometry](docs/demos/preview_sacred.png) |
 | **Mycelial** | Biomorphic fungal networks, bioluminescent growth, and spore-driven particle blooms | ![Mycelial](docs/demos/preview_mycelial.png) |
 | **Fluid** | Chrome-like ferrofluid blobs with viscous metal ripples and specular reflections | ![Fluid](docs/demos/preview_fluid.png) |
-| **Orrery** | Chaotic three-body orrery with brass planets, nested rings, and orbital trails | ![Orrery](docs/demos/preview_orrery.png) |
+| **Orrery** | Chaotic orrery with brass planets, nested rings, and orbital trails | ![Orrery](docs/demos/preview_orrery.png) |
 | **Quark** | Quantum field visualizer with probability clouds, entangled particles, and interference patterns | ![Quark](docs/demos/preview_quark.png) |
 
 **Audio-to-Visual Mapping:**
