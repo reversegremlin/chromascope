@@ -10,6 +10,7 @@ const KNOB_TOOLTIPS = {
         glass: "Number of mirror wedges",
         flower: "Petal count per ring",
         spiral: "Number of spiral arms",
+        fractal: "Primary branch symmetry",
         circuit: "Radial symmetry segments",
         fibonacci: "Kaleidoscope mirror count",
         dmt: "Symmetry segment count",
@@ -24,6 +25,7 @@ const KNOB_TOOLTIPS = {
         glass: "Gem field radius",
         flower: "Flower bloom size",
         spiral: "Spiral reach distance",
+        fractal: "Fractal trunk length",
         circuit: "Circuit grid extent",
         fibonacci: "Golden spiral radius",
         dmt: "Hyperspace field size",
@@ -38,6 +40,7 @@ const KNOB_TOOLTIPS = {
         glass: "Gem scatter distance",
         flower: "Petal layer spacing",
         spiral: "Spiral arm length",
+        fractal: "Branch spread distance",
         circuit: "Circuit ring depth",
         fibonacci: "Golden rectangle extent",
         dmt: "Hyperspace layer depth",
@@ -52,6 +55,7 @@ const KNOB_TOOLTIPS = {
         glass: "Kaleidoscope spin rate",
         flower: "Petal rotation speed",
         spiral: "Spiral spin velocity",
+        fractal: "Branch drift speed",
         circuit: "Circuit rotation rate",
         fibonacci: "Golden spiral spin",
         dmt: "Hyperspace spin speed",
@@ -66,6 +70,7 @@ const KNOB_TOOLTIPS = {
         glass: "Beat pulse strength",
         flower: "Beat bloom punch",
         spiral: "Beat expansion force",
+        fractal: "Beat branch growth",
         circuit: "Beat pulse strength",
         fibonacci: "Beat growth punch",
         dmt: "Beat warp intensity",
@@ -80,6 +85,7 @@ const KNOB_TOOLTIPS = {
         glass: "Light trail smearing",
         flower: "Petal trail ghosting",
         spiral: "Spiral trail echo",
+        fractal: "Fractal afterimage",
         circuit: "Trace afterglow length",
         fibonacci: "Pattern trail decay",
         dmt: "Hyperspace trail blur",
@@ -94,6 +100,7 @@ const KNOB_TOOLTIPS = {
         glass: "Minimum gem facets",
         flower: "Min petal layers",
         spiral: "Min node polygon sides",
+        fractal: "Minimum recursion detail",
         circuit: "Min circuit node sides",
         fibonacci: "Min phyllotaxis facets",
         dmt: "Min geometry complexity",
@@ -108,6 +115,7 @@ const KNOB_TOOLTIPS = {
         glass: "Maximum gem facets",
         flower: "Max petal layers",
         spiral: "Max node polygon sides",
+        fractal: "Maximum recursion detail",
         circuit: "Max circuit node sides",
         fibonacci: "Max phyllotaxis facets",
         dmt: "Max geometry complexity",
@@ -122,6 +130,7 @@ const KNOB_TOOLTIPS = {
         glass: "Base gem stroke weight",
         flower: "Base petal stroke width",
         spiral: "Base spiral line weight",
+        fractal: "Base branch line weight",
         circuit: "Base trace thickness",
         fibonacci: "Base stroke weight",
         dmt: "Base geometry stroke",
@@ -136,6 +145,7 @@ const KNOB_TOOLTIPS = {
         glass: "Max gem stroke on beats",
         flower: "Max petal stroke on beats",
         spiral: "Max spiral width on beats",
+        fractal: "Max branch width on beats",
         circuit: "Max trace width on beats",
         fibonacci: "Max stroke on beats",
         dmt: "Max geometry stroke on beats",
@@ -152,7 +162,7 @@ class KaleidoscopeStudio {
         // Configuration state
         this.config = {
             // Style
-            style: 'geometric', // geometric, glass, flower, spiral, circuit, fibonacci, dmt, sacred, mycelial, fluid, orrery, quark
+            style: 'geometric', // geometric, glass, flower, spiral, fractal, circuit, fibonacci, dmt, sacred, mycelial, fluid, orrery, quark
             shapeSeed: Math.floor(Math.random() * 10000), // Random seed for shape generation
             glassSlices: 30, // Number of shape slices in Glass style (10-60)
             // Geometry

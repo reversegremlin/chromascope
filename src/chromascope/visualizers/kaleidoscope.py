@@ -356,6 +356,19 @@ class KaleidoscopeRenderer:
         secondary_hue = (hue + 0.5) % 1.0
         secondary_color = self._hue_to_rgb(secondary_hue, 0.7, 0.8)
 
+        if cfg.style == "fractal":
+            self._draw_fractal_kaleidoscope(
+                surface=surface,
+                center=center,
+                radius=radius,
+                hue=hue,
+                thickness=thickness,
+                percussive=percussive,
+                harmonic=harmonic,
+                brightness=brightness,
+            )
+            return
+
         if cfg.style == "glass":
             self._draw_glass_kaleidoscope(
                 surface=surface,
@@ -414,6 +427,69 @@ class KaleidoscopeRenderer:
             self._hue_to_rgb(hue, 0.9, 1.0),
             thickness + 2,
         )
+
+    def _draw_fractal_kaleidoscope(
+        self,
+        surface: pygame.Surface,
+        center: tuple[float, float],
+        radius: float,
+        hue: float,
+        thickness: int,
+        percussive: float,
+        harmonic: float,
+        brightness: float,
+    ):
+        """Draw a recursive mirrored fractal distinct from geometric style."""
+        cfg = self.config
+        mirror_count = max(6, cfg.num_mirrors)
+        max_depth = max(4, min(7, cfg.max_sides // 3))
+        base_length = radius * (0.55 + percussive * 0.35)
+        branch_scale = 0.62 + harmonic * 0.16
+
+        def branch(start: tuple[float, float], length: float, angle: float, depth: int, hue_shift: float):
+            if depth <= 0 or length < 2:
+                return
+
+            bend = math.sin(self.accumulated_rotation * (1.5 + depth * 0.35) + depth + hue_shift) * (0.15 + percussive * 0.12)
+            end = (
+                start[0] + math.cos(angle + bend) * length,
+                start[1] + math.sin(angle + bend) * length,
+            )
+            line_hue = (hue + hue_shift) % 1.0
+            line_color = self._hue_to_rgb(line_hue, 0.95, 0.45 + depth * 0.08 + brightness * 0.2)
+            pygame.draw.line(
+                surface,
+                line_color,
+                (int(start[0]), int(start[1])),
+                (int(end[0]), int(end[1])),
+                max(1, int(thickness * (0.18 + depth * 0.12))),
+            )
+
+            if depth <= 2:
+                node = self._hue_to_rgb((line_hue + 0.08) % 1.0, 1.0, 0.95)
+                pygame.draw.circle(surface, node, (int(end[0]), int(end[1])), max(1, int(1.2 + (max_depth - depth) * 0.8)))
+
+            split = 0.42 + percussive * 0.18
+            branch(end, length * branch_scale, angle + split, depth - 1, hue_shift + 0.06)
+            branch(end, length * branch_scale, angle - split, depth - 1, hue_shift - 0.05)
+            if depth > 3:
+                branch(end, length * (branch_scale - 0.08), angle + bend * 0.6, depth - 2, hue_shift + 0.12)
+
+        for i in range(mirror_count):
+            a = (2 * math.pi * i / mirror_count) + self.accumulated_rotation * 0.35
+            branch(center, base_length, a - math.pi / 2, max_depth, i / mirror_count)
+
+        spikes = cfg.min_sides + 6
+        pts = []
+        for i in range(spikes):
+            a = (2 * math.pi * i / spikes) + self.accumulated_rotation * 0.8
+            rr = radius * (0.08 + (0.06 if i % 2 else 0.12)) * (1 + percussive * 0.25)
+            pts.append((center[0] + math.cos(a) * rr, center[1] + math.sin(a) * rr))
+
+        core_fill = self._hue_to_rgb((hue + 0.53) % 1.0, 1.0, 0.75 + brightness * 0.2)
+        core_edge = self._hue_to_rgb((hue + 0.08) % 1.0, 1.0, 0.9)
+        pygame.draw.polygon(surface, core_fill, pts, 0)
+        pygame.draw.polygon(surface, core_edge, pts, max(1, int(thickness * 0.35)))
 
     def _draw_glass_kaleidoscope(
         self,

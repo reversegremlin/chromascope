@@ -168,6 +168,9 @@
             case 'spiral':
                 this.renderSpiralBackground(ctx, width, height, centerX, centerY, reactivity);
                 break;
+            case 'fractal':
+                this.renderFractalBackground(ctx, width, height, centerX, centerY, reactivity);
+                break;
             case 'circuit':
                 this.renderCircuitBackground(ctx, width, height, centerX, centerY, reactivity);
                 break;
@@ -1542,7 +1545,7 @@
 
         // Per-style size normalization — keeps visual footprint consistent across styles
         const sizeScale = {
-            circuit: 0.75, fibonacci: 1.15, dmt: 1.1, fluid: 1.5, quark: 1.3
+            circuit: 0.75, fibonacci: 1.15, dmt: 1.1, fluid: 1.5, quark: 1.3, fractal: 1.05
         }[config.style] || 1.0;
         const scaledRadius = radius * sizeScale;
 
@@ -1556,6 +1559,9 @@
                 break;
             case 'spiral':
                 this.renderSpiralStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
+                break;
+            case 'fractal':
+                this.renderFractalStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
                 break;
             case 'circuit':
                 this.renderCircuitStyle(ctx, centerX, centerY, scaledRadius, numSides, hue, thickness);
@@ -1690,6 +1696,113 @@
     seededRandom(seed) {
         const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
         return x - Math.floor(x);
+    }
+
+    /**
+     * Fractal background — recursive star field with mirrored drift
+     */
+    renderFractalBackground(ctx, width, height, centerX, centerY, reactivity) {
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+        const energy = this.smoothedValues.percussiveImpact;
+        const layers = 5;
+
+        for (let l = 0; l < layers; l++) {
+            const lp = (l + 1) / layers;
+            const hue = (220 + l * 32 + harmonic * 100) % 360;
+            const radius = Math.max(width, height) * (0.18 + lp * 0.72);
+            const spokes = 8 + l * 5;
+            const rot = this._bgFractalRotation * (0.6 + lp * 1.4) * (l % 2 ? -1 : 1);
+
+            for (let i = 0; i < spokes; i++) {
+                const a = (Math.PI * 2 * i) / spokes + rot;
+                const x1 = centerX + Math.cos(a) * radius * 0.25;
+                const y1 = centerY + Math.sin(a) * radius * 0.25;
+                const x2 = centerX + Math.cos(a + 0.4) * radius;
+                const y2 = centerY + Math.sin(a + 0.4) * radius;
+                ctx.strokeStyle = `hsla(${hue}, 95%, ${40 + lp * 26 + brightness * 15}%, ${0.08 + lp * 0.11 + energy * 0.08})`;
+                ctx.lineWidth = 0.5 + lp * 1.1;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+    }
+
+    /**
+     * Fractal style — recursive mirrored branches and luminous nodes
+     */
+    renderFractalStyle(ctx, centerX, centerY, radius, numSides, hue, thickness) {
+        const config = this.config;
+        const energy = this.smoothedValues.percussiveImpact;
+        const harmonic = this.smoothedValues.harmonicEnergy;
+        const brightness = this.smoothedValues.spectralBrightness;
+
+        const mirrors = Math.max(6, config.mirrors);
+        const maxDepth = Math.max(4, Math.min(7, Math.floor(config.maxSides / 3)));
+        const branchScale = 0.62 + harmonic * 0.16;
+
+        const drawBranch = (x, y, len, angle, depth, hueShift) => {
+            if (depth <= 0 || len < 2) return;
+
+            const bend = Math.sin(this.accumulatedRotation * (1.5 + depth * 0.35) + depth + hueShift) * (0.15 + energy * 0.12);
+            const nx = x + Math.cos(angle + bend) * len;
+            const ny = y + Math.sin(angle + bend) * len;
+            const light = 45 + depth * 7 + brightness * 20;
+            ctx.strokeStyle = `hsla(${(hue + hueShift) % 360}, 98%, ${light}%, ${0.25 + depth * 0.08})`;
+            ctx.lineWidth = Math.max(0.5, thickness * (0.18 + depth * 0.12));
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(nx, ny);
+            ctx.stroke();
+
+            if (depth <= 2) {
+                ctx.fillStyle = `hsla(${(hue + hueShift + 25) % 360}, 100%, 76%, 0.7)`;
+                ctx.beginPath();
+                ctx.arc(nx, ny, 1.4 + (maxDepth - depth) * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const split = 0.42 + energy * 0.18;
+            drawBranch(nx, ny, len * branchScale, angle + split, depth - 1, hueShift + 22);
+            drawBranch(nx, ny, len * branchScale, angle - split, depth - 1, hueShift - 18);
+            if (depth > 3) {
+                drawBranch(nx, ny, len * (branchScale - 0.08), angle + bend * 0.6, depth - 2, hueShift + 45);
+            }
+        };
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        const rot = this.accumulatedRotation * 0.35;
+
+        for (let i = 0; i < mirrors; i++) {
+            const a = (Math.PI * 2 * i) / mirrors + rot;
+            ctx.save();
+            ctx.rotate(a);
+            if (i % 2 === 1) ctx.scale(1, -1);
+            drawBranch(0, 0, radius * (0.55 + energy * 0.35), -Math.PI / 2, maxDepth, i * (360 / mirrors));
+            ctx.restore();
+        }
+
+        // crystalline core unlike geometric polygons
+        const spikes = numSides + 6;
+        ctx.beginPath();
+        for (let i = 0; i < spikes; i++) {
+            const a = (Math.PI * 2 * i) / spikes + this.accumulatedRotation * 0.8;
+            const rr = radius * (0.08 + (i % 2 ? 0.06 : 0.12)) * (1 + energy * 0.25);
+            const x = Math.cos(a) * rr;
+            const y = Math.sin(a) * rr;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `hsla(${(hue + 190) % 360}, 100%, ${68 + brightness * 20}%, 0.8)`;
+        ctx.strokeStyle = `hsla(${(hue + 30) % 360}, 100%, 82%, 0.7)`;
+        ctx.lineWidth = Math.max(0.8, thickness * 0.35);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
     }
 
     /**

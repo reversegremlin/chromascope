@@ -48,6 +48,18 @@
       "orbit_radius": 280.0,
       "rotation_speed": 2.5
     },
+    "fractal": {
+      "num_mirrors": 9,
+      "trail_alpha": 62,
+      "base_radius": 165.0,
+      "max_scale": 2.3,
+      "min_sides": 4,
+      "max_sides": 20,
+      "base_thickness": 2,
+      "max_thickness": 10,
+      "orbit_radius": 240.0,
+      "rotation_speed": 2.1
+    },
     "circuit": {
       "num_mirrors": 8,
       "trail_alpha": 60,
