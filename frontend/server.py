@@ -130,6 +130,18 @@ class KaleidoscopeHandler(SimpleHTTPRequestHandler):
     def handle_render(self):
         """Start video rendering task."""
         try:
+            # Fast dependency check for export path.
+            try:
+                import pygame  # noqa: F401
+            except Exception:
+                self.send_response(503)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "error": "Video export requires optional dependency 'pygame'. Install it in this environment to enable /api/render.",
+                }).encode())
+                return
+
             # Parse multipart form data
             content_type = self.headers.get("Content-Type", "")
             if "multipart/form-data" not in content_type:

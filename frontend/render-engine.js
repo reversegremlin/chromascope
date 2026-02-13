@@ -1704,7 +1704,9 @@
         const brightness = this.smoothedValues.spectralBrightness;
 
         const mirrors = Math.max(10, config.mirrors * 2);
-        const maxReach = Math.max(this.width, this.height) * 0.76;
+        const canvasW = Number.isFinite(this.canvas?.width) ? this.canvas.width : config.width;
+        const canvasH = Number.isFinite(this.canvas?.height) ? this.canvas.height : config.height;
+        const maxReach = Math.max(canvasW || 0, canvasH || 0) * 0.76;
         const beatBoost = 1 + energy * (config.maxScale - 1) * 0.32;
         const rings = Math.max(7, Math.floor(config.glassSlices / 3));
         const petalsBase = Math.max(16, numSides * 2);
@@ -1714,6 +1716,10 @@
         const cyan = (hue + 170) % 360;
         const magenta = (hue + 320) % 360;
         const amber = (hue + 30) % 360;
+
+        if (!Number.isFinite(maxReach) || maxReach <= 0 || !Number.isFinite(hue)) {
+            return;
+        }
 
         ctx.save();
         ctx.translate(centerX, centerY);
