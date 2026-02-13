@@ -1699,35 +1699,153 @@
      */
     renderGlassStyle(ctx, centerX, centerY, radius, numSides, hue, thickness) {
         const config = this.config;
-        const mirrors = config.mirrors * 2;
         const energy = this.smoothedValues.percussiveImpact;
         const harmonic = this.smoothedValues.harmonicEnergy;
         const brightness = this.smoothedValues.spectralBrightness;
-        const seed = config.shapeSeed;
-        const orbitFactor = config.orbitRadius / 200;
 
+        const mirrors = Math.max(8, config.mirrors * 2);
+        const wedge = (Math.PI * 2) / mirrors;
+        const maxReach = Math.max(this.width, this.height) * 0.7;
+        const beatBoost = 1 + energy * (config.maxScale - 1) * 0.28;
+        const textureBands = Math.max(6, Math.floor(config.glassSlices / 4));
+        const filamentSegments = Math.max(12, Math.floor(config.glassSlices * 0.75));
+
+        // Keep center open and small; focus detail throughout full frame.
         ctx.save();
         ctx.translate(centerX, centerY);
+        ctx.rotate(this.accumulatedRotation * 0.12);
 
-        const globalRotation = this.accumulatedRotation * 0.2;
-        ctx.rotate(globalRotation);
+        // Layer 1: mirrored psychedelic filaments.
+        for (let band = 0; band < textureBands; band++) {
+            const b = (band + 1) / textureBands;
+            const bandReach = maxReach * (0.18 + b * 0.92) * beatBoost;
+            const bandSpin = this.accumulatedRotation * (0.25 + b * 1.4);
+            const lineW = Math.max(0.6, thickness * (0.15 + b * 0.35));
 
-        // Draw mirrored wedges with faceted content
-        for (let m = 0; m < mirrors; m++) {
-            ctx.save();
-            ctx.rotate((Math.PI * 2 * m) / mirrors);
-            if (m % 2 === 1) {
-                ctx.scale(-1, 1);
+            for (let i = 0; i < mirrors; i++) {
+                const axis = i * wedge + bandSpin;
+                const sign = i % 2 ? -1 : 1;
+                const pts = [];
+
+                for (let s = 0; s <= filamentSegments; s++) {
+                    const t = s / filamentSegments;
+                    const wave = Math.sin(this.accumulatedRotation * (2.5 + b) + t * Math.PI * (8 + b * 6) + i * 0.9);
+                    const flutter = Math.cos(this.accumulatedRotation * (1.7 + harmonic) + t * Math.PI * (5 + b * 7) + band * 0.6);
+                    const theta = axis + sign * (t - 0.5) * wedge * 1.04 + flutter * 0.08;
+                    const r = bandReach * (0.14 + 0.96 * t + wave * 0.08);
+                    pts.push([Math.cos(theta) * r, Math.sin(theta) * r]);
+                }
+
+                const h = (hue + 150 + b * 120 + i * 2.5 + harmonic * 90) % 360;
+                ctx.strokeStyle = `hsla(${h}, ${Math.min(100, config.saturation + 8)}%, ${56 + b * 26 + brightness * 12}%, ${0.22 + b * 0.25})`;
+                ctx.lineWidth = lineW * 2.6;
+                ctx.beginPath();
+                pts.forEach((p, idx) => idx ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+                ctx.stroke();
+
+                ctx.strokeStyle = `hsla(${(h + 20) % 360}, ${Math.min(100, config.saturation + 15)}%, ${68 + b * 20 + energy * 10}%, ${0.5 + b * 0.25})`;
+                ctx.lineWidth = lineW;
+                ctx.beginPath();
+                pts.forEach((p, idx) => idx ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+                ctx.stroke();
+
+                // micro sparkle nodes
+                const sparks = 3 + Math.floor(b * 5);
+                for (let n = 1; n <= sparks; n++) {
+                    const idx = Math.floor((n / (sparks + 1)) * (pts.length - 1));
+                    const [sx, sy] = pts[idx];
+                    const sh = (h + 35 + n * 12) % 360;
+                    ctx.fillStyle = `hsla(${sh}, 100%, ${70 + brightness * 20}%, 0.8)`;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 0.8 + b * 1.6 + energy * 1.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
-            this.drawGlassWedge(ctx, radius, hue, thickness, seed, m, numSides, orbitFactor);
-            ctx.restore();
         }
 
-        ctx.restore();
+        // Layer 2: distributed shard mesh (no giant center facet).
+        const shardBands = Math.max(4, Math.floor(config.glassSlices / 5));
+        for (let band = 0; band < shardBands; band++) {
+            const b = (band + 1) / shardBands;
+            const ringR = maxReach * (0.2 + b * 0.85);
+            const facetsPerWedge = 3 + Math.floor(b * 4);
+            const spin = this.accumulatedRotation * (0.18 + b * 0.9);
 
-        // Multi-layered central jewel
-        const jewelSize = radius * (0.3 + energy * 0.25);
-        this.drawCentralJewel(ctx, centerX, centerY, jewelSize, hue, energy, numSides, thickness);
+            for (let i = 0; i < mirrors; i++) {
+                const mid = i * wedge + spin;
+                for (let f = 0; f < facetsPerWedge; f++) {
+                    const fp = (f + 1) / (facetsPerWedge + 1);
+                    const spread = (fp - 0.5) * wedge * 0.9;
+                    const inner = ringR * (0.68 + 0.26 * Math.sin(this.accumulatedRotation + fp * Math.PI));
+                    const outer = inner + radius * (0.2 + 0.38 * fp) * beatBoost;
+
+                    const a0 = mid + spread - wedge * 0.08;
+                    const a1 = mid + spread + wedge * 0.08;
+                    const p0 = [Math.cos(a0) * inner, Math.sin(a0) * inner];
+                    const p1 = [Math.cos(mid + spread) * outer, Math.sin(mid + spread) * outer];
+                    const p2 = [Math.cos(a1) * inner, Math.sin(a1) * inner];
+
+                    const sh = (hue + 30 + b * 110 + fp * 80 + brightness * 40) % 360;
+                    ctx.fillStyle = `hsla(${sh}, ${Math.min(100, config.saturation + 5)}%, ${45 + b * 25 + brightness * 12}%, 0.2)`;
+                    ctx.beginPath();
+                    ctx.moveTo(p0[0], p0[1]);
+                    ctx.lineTo(p1[0], p1[1]);
+                    ctx.lineTo(p2[0], p2[1]);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.strokeStyle = `hsla(${(sh + 45) % 360}, ${Math.min(100, config.saturation + 10)}%, ${66 + b * 20}%, ${0.35 + b * 0.35})`;
+                    ctx.lineWidth = Math.max(0.5, thickness * (0.12 + b * 0.2));
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Layer 3: intricate but compact mandala core.
+        const rosetteLayers = 5 + Math.floor(config.glassSlices / 12);
+        const rosetteBase = Math.max(10, numSides + config.mirrors);
+        for (let layer = 0; layer < rosetteLayers; layer++) {
+            const lp = (layer + 1) / rosetteLayers;
+            const petals = rosetteBase + layer * 3;
+            const layerR = radius * (0.08 + lp * 0.28) * beatBoost;
+            const wobble = 0.06 + lp * 0.14;
+
+            ctx.beginPath();
+            for (let p = 0; p < petals; p++) {
+                const a = (Math.PI * 2 * p) / petals + this.accumulatedRotation * (0.3 + lp * 0.9);
+                const rr = layerR * (1 + Math.sin(a * (2 + (layer % 4)) + this.accumulatedRotation * 2.8) * wobble);
+                const x = Math.cos(a) * rr;
+                const y = Math.sin(a) * rr;
+                if (p === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+
+            const rh = (hue + 25 + lp * 80 + harmonic * 30) % 360;
+            ctx.fillStyle = `hsla(${rh}, ${Math.min(100, config.saturation + 10)}%, ${46 + lp * 28 + brightness * 12}%, ${0.12 + lp * 0.18})`;
+            ctx.fill();
+            ctx.strokeStyle = `hsla(${(rh + 55) % 360}, ${Math.min(100, config.saturation + 8)}%, ${66 + lp * 16}%, ${0.24 + lp * 0.26})`;
+            ctx.lineWidth = Math.max(0.5, thickness * 0.16);
+            ctx.stroke();
+        }
+
+        // Tiny luminous nucleus.
+        const coreHue = (hue + 190) % 360;
+        const coreR = Math.max(4, radius * (0.03 + energy * 0.02));
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR * 3.4);
+        g.addColorStop(0, `hsla(${coreHue}, 100%, 95%, 0.95)`);
+        g.addColorStop(0.25, `hsla(${(coreHue + 30) % 360}, 95%, 75%, 0.6)`);
+        g.addColorStop(1, `hsla(${coreHue}, 90%, 50%, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, coreR * 3.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `hsla(${coreHue}, 100%, 92%, 0.95)`;
+        ctx.beginPath();
+        ctx.arc(0, 0, coreR, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
     }
 
     drawGlassWedge(ctx, maxRadius, hue, thickness, baseSeed, wedgeIndex, numSides, orbitFactor) {
