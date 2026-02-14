@@ -37,6 +37,7 @@ dev = [
 
 [project.scripts]
 chromascope = "chromascope.cli:main"
+chromascope-universe = "chromascope.experimental.universe:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

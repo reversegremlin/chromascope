@@ -155,7 +155,18 @@
       "max_thickness": 10,
       "orbit_radius": 290.0,
       "rotation_speed": 2.3
+    },
+    "universe": {
+      "num_mirrors": 16,
+      "trail_alpha": 78,
+      "base_radius": 220.0,
+      "max_scale": 2.8,
+      "min_sides": 6,
+      "max_sides": 24,
+      "base_thickness": 2,
+      "max_thickness": 11,
+      "orbit_radius": 320.0,
+      "rotation_speed": 2.4
     }
   }
 }
-

@@ -135,6 +135,9 @@ chromascope song.mp3 -o manifest.json --fps 60 --summary
 
 # Render kaleidoscope video
 python -m chromascope.render_video song.mp3 -o output.mp4
+
+# Experimental "inner-universe" renderer (defaults to 4K/60)
+chromascope-universe song.mp3 -o universe.mp4 --preset 4k --fps 60
 ```
 
 ### Web Interface (Chromascope Studio)
