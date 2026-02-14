@@ -1,0 +1,92 @@
+"""Tests for color grading and post-processing."""
+
+import numpy as np
+import pytest
+
+from chromascope.experiment.colorgrade import (
+    add_glow,
+    apply_palette,
+    chromatic_aberration,
+    vignette,
+)
+
+
+class TestApplyPalette:
+    def test_output_shape(self):
+        vals = np.random.rand(120, 160).astype(np.float32)
+        result = apply_palette(vals)
+        assert result.shape == (120, 160, 3)
+
+    def test_output_dtype(self):
+        vals = np.random.rand(60, 80).astype(np.float32)
+        result = apply_palette(vals)
+        assert result.dtype == np.uint8
+
+    def test_output_range(self):
+        vals = np.random.rand(60, 80).astype(np.float32)
+        result = apply_palette(vals)
+        assert result.min() >= 0
+        assert result.max() <= 255
+
+    def test_hue_affects_color(self):
+        vals = np.full((60, 80), 0.5, dtype=np.float32)
+        r1 = apply_palette(vals, hue_base=0.0)
+        r2 = apply_palette(vals, hue_base=0.5)
+        assert not np.array_equal(r1, r2)
+
+
+class TestAddGlow:
+    def test_output_shape(self):
+        frame = np.random.randint(0, 255, (120, 160, 3), dtype=np.uint8)
+        result = add_glow(frame, intensity=0.3)
+        assert result.shape == frame.shape
+        assert result.dtype == np.uint8
+
+    def test_zero_intensity_passthrough(self):
+        frame = np.random.randint(0, 255, (60, 80, 3), dtype=np.uint8)
+        result = add_glow(frame, intensity=0.0)
+        np.testing.assert_array_equal(result, frame)
+
+    def test_glow_brightens(self):
+        frame = np.full((60, 80, 3), 128, dtype=np.uint8)
+        result = add_glow(frame, intensity=0.5, radius=10)
+        assert result.mean() >= frame.mean()
+
+
+class TestChromaticAberration:
+    def test_output_shape(self):
+        frame = np.random.randint(0, 255, (120, 160, 3), dtype=np.uint8)
+        result = chromatic_aberration(frame, offset=3)
+        assert result.shape == frame.shape
+
+    def test_zero_offset_passthrough(self):
+        frame = np.random.randint(0, 255, (60, 80, 3), dtype=np.uint8)
+        result = chromatic_aberration(frame, offset=0)
+        np.testing.assert_array_equal(result, frame)
+
+    def test_channels_shifted(self):
+        frame = np.random.randint(50, 200, (60, 80, 3), dtype=np.uint8)
+        result = chromatic_aberration(frame, offset=5)
+        # Green channel should be unchanged
+        np.testing.assert_array_equal(result[:, :, 1], frame[:, :, 1])
+        # R and B channels should differ
+        assert not np.array_equal(result[:, :, 0], frame[:, :, 0])
+
+
+class TestVignette:
+    def test_output_shape(self):
+        frame = np.random.randint(0, 255, (120, 160, 3), dtype=np.uint8)
+        result = vignette(frame, strength=0.4)
+        assert result.shape == frame.shape
+
+    def test_center_brighter_than_edges(self):
+        frame = np.full((200, 200, 3), 200, dtype=np.uint8)
+        result = vignette(frame, strength=0.5)
+        center_val = result[100, 100].mean()
+        corner_val = result[0, 0].mean()
+        assert center_val > corner_val
+
+    def test_zero_strength_passthrough(self):
+        frame = np.random.randint(0, 255, (60, 80, 3), dtype=np.uint8)
+        result = vignette(frame, strength=0.0)
+        np.testing.assert_array_equal(result, frame)

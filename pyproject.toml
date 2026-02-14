@@ -34,9 +34,13 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
+experiment = [
+    "Pillow>=10.0.0",
+]
 
 [project.scripts]
 chromascope = "chromascope.cli:main"
+chromascope-fractal = "chromascope.experiment.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
