@@ -1,8 +1,9 @@
 """
-CLI entry point for the fractal kaleidoscope experiment.
+CLI entry point for the Fractal Kaleidoscope renderer.
 
 Usage:
-    python -m chromascope.experiment.cli <audio_file> [options]
+    chromascope-fractal <audio_file> [options]
+    python -m chromascope.experiment <audio_file> [options]
 """
 
 import argparse
