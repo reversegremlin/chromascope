@@ -94,3 +94,45 @@ class TestFractalKaleidoscopeRenderer:
             pass
         assert len(progress) == 3
         assert progress[-1] == (3, 3)
+
+    def test_sustained_bass_no_washout(self):
+        """Regression: sustained heavy bass should not wash out to white."""
+        config = RenderConfig(
+            width=80, height=60, fps=30,
+            glow_enabled=True,
+            aberration_enabled=False,
+        )
+        renderer = FractalKaleidoscopeRenderer(config)
+
+        # Simulate 60 frames of sustained heavy bass
+        frames_data = []
+        for i in range(60):
+            frames_data.append({
+                "frame_index": i,
+                "time": i / 30,
+                "is_beat": i % 4 == 0,  # frequent beats
+                "is_onset": i % 2 == 0,
+                "percussive_impact": 0.9,  # sustained heavy percussion
+                "harmonic_energy": 0.7,
+                "global_energy": 0.8,
+                "low_energy": 0.9,  # heavy bass
+                "mid_energy": 0.5,
+                "high_energy": 0.6,
+                "spectral_brightness": 0.7,
+                "dominant_chroma": "C",
+                "pitch_hue": 0.0,
+                "texture": 0.5,
+            })
+        manifest = {
+            "metadata": {"bpm": 140, "duration": 2.0, "fps": 30},
+            "frames": frames_data,
+        }
+
+        rendered = list(renderer.render_manifest(manifest))
+        last_frame = rendered[-1]
+        mean_brightness = last_frame.mean()
+
+        # The last frame should NOT be washed out (near-white = mean > 240)
+        assert mean_brightness < 240, (
+            f"Brightness washout detected: mean={mean_brightness:.1f}"
+        )

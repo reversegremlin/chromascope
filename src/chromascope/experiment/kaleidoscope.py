@@ -186,7 +186,7 @@ def infinite_zoom_blend(
 
     blended = (
         current_f * blend_mask
-        + zoomed_arr * feedback_alpha * (1 - blend_mask * 0.5)
+        + zoomed_arr * feedback_alpha * (1 - blend_mask)
     )
 
     return np.clip(blended, 0, 255).astype(np.uint8)

@@ -16,6 +16,7 @@ from chromascope.experiment.colorgrade import (
     add_glow,
     apply_palette,
     chromatic_aberration,
+    tone_map_soft,
     vignette,
 )
 from chromascope.experiment.fractal import (
@@ -299,7 +300,8 @@ class FractalKaleidoscopeRenderer:
         # --- Post-processing ---
 
         if cfg.glow_enabled:
-            glow_int = cfg.glow_intensity * (1.0 + self._smooth_percussive * 0.5)
+            glow_int = cfg.glow_intensity * (1.0 + self._smooth_percussive * 0.3)
+            glow_int = min(glow_int, 0.45)
             frame_rgb = add_glow(frame_rgb, intensity=glow_int, radius=cfg.glow_radius)
 
         if cfg.aberration_enabled:
@@ -310,6 +312,9 @@ class FractalKaleidoscopeRenderer:
 
         if cfg.vignette_strength > 0:
             frame_rgb = vignette(frame_rgb, strength=cfg.vignette_strength)
+
+        # Tone-map before storing in feedback buffer to break brightness accumulation
+        frame_rgb = tone_map_soft(frame_rgb)
 
         # Update feedback buffer
         self.feedback_buffer = frame_rgb.copy()
