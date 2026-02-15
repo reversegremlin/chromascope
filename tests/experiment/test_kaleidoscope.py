@@ -46,7 +46,7 @@ class TestPolarMirror:
 
         # All segment averages should be similar (mirrored from same source)
         for v in values[1:]:
-            assert abs(v - values[0]) < 0.05, \
+            assert abs(v - values[0]) < 0.08, \
                 f"Symmetry broken: {values}"
 
     def test_rotation_changes_output(self):

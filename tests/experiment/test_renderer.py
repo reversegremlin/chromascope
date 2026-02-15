@@ -104,9 +104,11 @@ class TestFractalKaleidoscopeRenderer:
         )
         renderer = FractalKaleidoscopeRenderer(config)
 
-        # Simulate 60 frames of sustained heavy bass
+        # Simulate 120 frames (4s) of sustained heavy bass — enough for
+        # zoom to escalate and potentially produce featureless fractals
+        n_frames = 120
         frames_data = []
-        for i in range(60):
+        for i in range(n_frames):
             frames_data.append({
                 "frame_index": i,
                 "time": i / 30,
@@ -124,7 +126,7 @@ class TestFractalKaleidoscopeRenderer:
                 "texture": 0.5,
             })
         manifest = {
-            "metadata": {"bpm": 140, "duration": 2.0, "fps": 30},
+            "metadata": {"bpm": 140, "duration": n_frames / 30, "fps": 30},
             "frames": frames_data,
         }
 
@@ -132,7 +134,46 @@ class TestFractalKaleidoscopeRenderer:
         last_frame = rendered[-1]
         mean_brightness = last_frame.mean()
 
-        # The last frame should NOT be washed out (near-white = mean > 240)
-        assert mean_brightness < 240, (
+        # The last frame should NOT be washed out (near-white = mean > 200)
+        assert mean_brightness < 200, (
             f"Brightness washout detected: mean={mean_brightness:.1f}"
+        )
+        # Should still have spatial contrast (std > 10 = visible detail)
+        assert last_frame.std() > 10, (
+            f"Detail lost: std={last_frame.std():.1f}"
+        )
+
+    def test_fractal_zoom_cap_preserves_detail(self):
+        """After many beat-heavy frames, fractal should still have texture."""
+        config = RenderConfig(
+            width=80, height=60, fps=30,
+            glow_enabled=False, aberration_enabled=False,
+            vignette_strength=0.0,
+        )
+        renderer = FractalKaleidoscopeRenderer(config)
+
+        # Drive zoom_level very high via repeated beats
+        for i in range(200):
+            frame_data = {
+                "frame_index": i, "time": i / 30,
+                "is_beat": True,  # every frame is a beat
+                "is_onset": True,
+                "percussive_impact": 1.0,
+                "harmonic_energy": 0.5,
+                "global_energy": 0.9,
+                "low_energy": 0.8,
+                "mid_energy": 0.5,
+                "high_energy": 0.5,
+                "spectral_brightness": 0.5,
+                "dominant_chroma": "C",
+                "pitch_hue": 0.0,
+                "texture": 0.5,
+            }
+            frame = renderer.render_frame(frame_data, i)
+
+        # zoom_level should be very high, but fractal zoom is capped
+        assert renderer.zoom_level > 100, "zoom_level should have grown"
+        # Last frame should still have contrast (not flat washed out)
+        assert frame.std() > 8, (
+            f"Fractal detail lost despite zoom cap: std={frame.std():.1f}"
         )

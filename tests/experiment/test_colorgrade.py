@@ -35,6 +35,15 @@ class TestApplyPalette:
         r2 = apply_palette(vals, hue_base=0.5)
         assert not np.array_equal(r1, r2)
 
+    def test_value_floor_prevents_pure_black(self):
+        """Even with zero escape values, palette should not produce pure black."""
+        vals = np.zeros((60, 80), dtype=np.float32)  # all pixels in interior
+        result = apply_palette(vals, saturation=0.85, contrast=1.4)
+        # With 0.06 value floor, min channel should be > 0
+        assert result.max() > 0, (
+            f"Palette produced pure black: max={result.max()}"
+        )
+
 
 class TestAddGlow:
     def test_output_shape(self):
@@ -135,3 +144,10 @@ class TestToneMapSoft:
         result = tone_map_soft(frame, shoulder=0.0)
         # Should be less than original since everything is above shoulder
         assert result.mean() < 128
+
+    def test_default_shoulder_catches_highlights(self):
+        """Default shoulder (0.78) should compress pixels above ~199."""
+        frame = np.full((10, 10, 3), 220, dtype=np.uint8)
+        result = tone_map_soft(frame)  # default shoulder=0.78
+        # 220 is above 0.78*255=198.9, so it should be compressed
+        assert result.mean() < 220
