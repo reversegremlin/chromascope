@@ -56,13 +56,13 @@ class RenderConfig:
     # Post-processing
     glow_enabled: bool = True
     glow_intensity: float = 0.35
-    glow_radius: int = 12
+    glow_radius: int = 15
     aberration_enabled: bool = True
     aberration_offset: int = 3
     vignette_strength: float = 0.3
 
     # Feedback / infinite zoom
-    feedback_alpha: float = 0.50
+    feedback_alpha: float = 0.20
     base_zoom_factor: float = 1.015
 
     # Warp
@@ -106,8 +106,36 @@ class FractalKaleidoscopeRenderer:
         # Lissajous drift state
         self._drift_phase = 0.0
 
+    # Default fallback c — always produces rich boundary detail
+    _DEFAULT_GOOD_C = complex(-0.7269, 0.1889)
+
     def _lerp(self, current: float, target: float, factor: float) -> float:
         return current + (target - current) * factor
+
+    @staticmethod
+    def _probe_c(c: complex, zoom: float, probe_iter: int) -> bool:
+        """Return True if *c* produces a detailed Julia set at *zoom*."""
+        probe = julia_set(32, 24, c=c, center=complex(0, 0),
+                          zoom=zoom, max_iter=probe_iter)
+        boundary_frac = float((probe > 0.4).mean())
+        return 0.10 < boundary_frac < 0.85
+
+    def _pick_best_c(
+        self, julia_c: complex, zoom: float, probe_iter: int,
+    ) -> complex:
+        """Choose the best c-value, falling back if the primary is flat."""
+        # 1. Try the current interpolated c
+        if self._probe_c(julia_c, zoom, probe_iter):
+            self._last_good_c = julia_c
+            return julia_c
+
+        # 2. Try the cached last-good c (may be stale at new zoom)
+        cached = getattr(self, '_last_good_c', None)
+        if cached is not None and self._probe_c(cached, zoom, probe_iter):
+            return cached
+
+        # 3. Guaranteed-good default
+        return self._DEFAULT_GOOD_C
 
     def _smooth_audio(self, frame_data: dict[str, Any]):
         """Update smoothed audio values from frame data."""
@@ -203,18 +231,18 @@ class FractalKaleidoscopeRenderer:
 
         # --- Generate fractal texture ---
 
-        # Soft-cap fractal zoom at ~2x so the Julia set boundary
-        # occupies a large fraction of the viewport.  Higher zoom
-        # isolates tiny boundary slices surrounded by featureless
-        # interior.  The feedback-buffer zoom provides the infinite-
-        # tunnel motion independently.
-        max_fz = 2.0
-        fractal_zoom = max_fz * math.tanh(self.zoom_level / max_fz)
+        # Fractal zoom breathes with the music rather than monotonically
+        # increasing.  Bass energy pushes the zoom inward (revealing
+        # finer boundary structure), while a slow sine oscillation keeps
+        # it moving so the Julia set boundary stays visible.  The
+        # feedback buffer provides the infinite-tunnel effect separately.
+        breath = 0.4 * math.sin(self.time * 0.4)
+        fractal_zoom = 1.0 + self._smooth_low * 0.5 + breath
+        fractal_zoom = max(0.6, min(fractal_zoom, 1.8))
 
-        # Lissajous drift — amplitude relative to fractal_zoom so the
-        # viewport wanders across the Julia set boundary.  Generous
-        # amplitude keeps the viewport exploring the boundary rather
-        # than sitting in a dark interior pocket.
+        # Lissajous drift — generous amplitude keeps the viewport
+        # exploring the Julia set boundary rather than sitting in a
+        # dark interior pocket.
         self._drift_phase += dt * 0.3
         drift_x = math.sin(self._drift_phase * 1.3) * 0.25 / max(fractal_zoom, 1)
         drift_y = math.cos(self._drift_phase * 0.9) * 0.18 / max(fractal_zoom, 1)
@@ -222,36 +250,19 @@ class FractalKaleidoscopeRenderer:
         # Cheap low-res probe to detect flat Julia sets BEFORE
         # spending time on the full-res render.  When the current
         # c-value produces a featureless set, fall back to a
-        # known-good c that always has detail at this zoom.
-        use_julia = cfg.fractal_mode == "julia" or (
-            cfg.fractal_mode == "blend" and self._smooth_percussive < 0.6
-        )
+        # known-good c.  Two-tier fallback: first try the last
+        # cached good c (re-probed at the CURRENT zoom), then
+        # the always-reliable default.
+        use_mandelbrot = cfg.fractal_mode == "mandelbrot"
         effective_c = julia_c
 
-        if use_julia:
-            probe = julia_set(32, 24, c=julia_c, center=complex(0, 0),
-                              zoom=fractal_zoom, max_iter=min(max_iter, 100))
-            probe_contrast = float(probe.max() - probe.min())
-            if probe_contrast < 0.1:
-                # Current c is boring — use the last good c, or a
-                # reliable fallback (Seahorse Valley always has detail)
-                effective_c = getattr(self, '_last_good_c',
-                                      complex(-0.7269, 0.1889))
-            else:
-                self._last_good_c = julia_c
-
-        if use_julia:
-            texture = julia_set(
-                cfg.width,
-                cfg.height,
-                c=effective_c,
-                center=complex(drift_x, drift_y),
-                zoom=fractal_zoom,
-                max_iter=max_iter,
+        if not use_mandelbrot:
+            probe_iter = min(max_iter, 100)
+            effective_c = self._pick_best_c(
+                julia_c, fractal_zoom, probe_iter,
             )
-        elif cfg.fractal_mode == "mandelbrot" or (
-            cfg.fractal_mode == "blend" and self._smooth_percussive >= 0.6
-        ):
+
+        if use_mandelbrot:
             texture = mandelbrot_zoom(
                 cfg.width,
                 cfg.height,
@@ -269,9 +280,10 @@ class FractalKaleidoscopeRenderer:
                 max_iter=max_iter,
             )
 
-        # Add noise for organic texture.  Extra injection into dark
-        # fractal regions fills featureless interiors with swirling detail.
-        if self._smooth_energy > 0.1:
+        # Light organic noise — very subtle, just to add living texture.
+        # Heavy noise injection destroys fractal boundary detail after
+        # the kaleidoscope mirror spreads it, so we keep this minimal.
+        if self._smooth_energy > 0.3:
             noise = noise_fractal(
                 cfg.width,
                 cfg.height,
@@ -279,10 +291,7 @@ class FractalKaleidoscopeRenderer:
                 octaves=4,
                 scale=2.0 + self._smooth_harmonic * 2,
             )
-            base_blend = 0.10 + self._smooth_energy * 0.15
-            # Dark pixels (low escape value) get extra noise injection
-            dark_boost = np.clip(1.0 - texture * 2.0, 0, 1) * 0.25
-            noise_blend = np.clip(base_blend + dark_boost, 0, 0.50)
+            noise_blend = 0.03 + self._smooth_energy * 0.04
             texture = texture * (1 - noise_blend) + noise * noise_blend
 
         # --- Radial warp (breathing) ---
@@ -336,7 +345,7 @@ class FractalKaleidoscopeRenderer:
 
         if cfg.glow_enabled:
             glow_int = cfg.glow_intensity * (1.0 + self._smooth_percussive * 0.3)
-            glow_int = min(glow_int, 0.45)
+            glow_int = min(glow_int, 0.50)
             frame_rgb = add_glow(frame_rgb, intensity=glow_int, radius=cfg.glow_radius)
 
         if cfg.aberration_enabled:
@@ -346,7 +355,12 @@ class FractalKaleidoscopeRenderer:
             frame_rgb = chromatic_aberration(frame_rgb, offset=ab_offset)
 
         if cfg.vignette_strength > 0:
-            frame_rgb = vignette(frame_rgb, strength=cfg.vignette_strength)
+            # Vignette pulses with percussion — beats contract the
+            # spotlight, drawing the eye inward to the fractal detail.
+            vign_str = cfg.vignette_strength * (
+                1.0 + self._smooth_percussive * 0.6
+            )
+            frame_rgb = vignette(frame_rgb, strength=vign_str)
 
         # Tone-map before storing in feedback buffer to break brightness accumulation
         frame_rgb = tone_map_soft(frame_rgb)

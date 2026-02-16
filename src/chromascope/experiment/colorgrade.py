@@ -44,10 +44,10 @@ def apply_palette(
     sat = sat * (0.7 + 0.3 * vals)  # desaturate near-zero areas slightly
 
     # Value: driven by escape-time — dark core, bright edges.
-    # Soft curve with a small floor so interior pixels aren't pure black
-    # (they get a hint of colour instead of dead space).  tone_map_soft
-    # handles highlight compression downstream.
-    value = np.clip((1.0 - (1.0 - vals) ** 1.3), 0.10, 1.0)
+    # Soft curve naturally reaches 0 at interior (pure black) which
+    # creates sharp boundary transitions.  Glow bloom fills dark areas
+    # with soft light from nearby boundary pixels.
+    value = (1.0 - (1.0 - vals) ** 1.3)
 
     # HSV to RGB (vectorized)
     rgb = _hsv_to_rgb_array(hue, sat, value)

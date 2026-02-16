@@ -183,17 +183,19 @@ def infinite_zoom_blend(
     )
     zoomed_arr = np.asarray(zoomed, dtype=np.float32)
 
-    # Blend: fresh fractal always dominates; feedback adds the
-    # infinite-zoom tunnel behind it.  High floor (0.55) ensures
-    # even dark fractal pixels keep their detail instead of being
-    # replaced by blurred feedback.
+    # Energy-conserving blend: feedback takes a fraction of the dark
+    # areas, and the current frame gets ALL remaining weight.  This
+    # prevents brightness loss from weights not summing to 1.0.
     current_f = current_frame.astype(np.float32)
     current_brightness = current_f.mean(axis=2, keepdims=True) / 255.0
-    blend_mask = np.clip(current_brightness * 3.0, 0.55, 1.0)
+    # feedback_share: how much of the frame goes to the zoom tunnel.
+    # Bright areas → 0 (fresh fractal only). Dark areas → up to
+    # feedback_alpha (subtle tunnel echo behind the fractal).
+    feedback_share = feedback_alpha * np.clip(1.0 - current_brightness * 3.0, 0, 0.20)
 
     blended = (
-        current_f * blend_mask
-        + zoomed_arr * feedback_alpha * (1 - blend_mask)
+        current_f * (1.0 - feedback_share)
+        + zoomed_arr * feedback_share
     )
 
     return np.clip(blended, 0, 255).astype(np.uint8)

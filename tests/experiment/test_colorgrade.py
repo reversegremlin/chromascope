@@ -35,13 +35,13 @@ class TestApplyPalette:
         r2 = apply_palette(vals, hue_base=0.5)
         assert not np.array_equal(r1, r2)
 
-    def test_value_floor_prevents_pure_black(self):
-        """Even with zero escape values, palette should not produce pure black."""
-        vals = np.zeros((60, 80), dtype=np.float32)  # all pixels in interior
+    def test_low_values_produce_dark_colors(self):
+        """Low escape values should produce dark but not necessarily black output."""
+        vals = np.full((60, 80), 0.1, dtype=np.float32)
         result = apply_palette(vals, saturation=0.85, contrast=1.4)
-        # With 0.06 value floor, min channel should be > 0
-        assert result.max() > 0, (
-            f"Palette produced pure black: max={result.max()}"
+        # Low values should be dim (dark jewel tones, not white)
+        assert result.mean() < 80, (
+            f"Low values too bright: mean={result.mean():.1f}"
         )
 
 
