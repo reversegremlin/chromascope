@@ -113,7 +113,7 @@ class FeatureAnalyzer:
             target_fps: Target frames per second for output alignment.
             n_fft: FFT window size.
         """
-        self.target_fps = target_fps
+        self.target_fps = target_fps or 60
         self.n_fft = n_fft
 
     def compute_hop_length(self, sr: int) -> int:

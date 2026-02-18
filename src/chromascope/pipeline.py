@@ -47,7 +47,7 @@ class AudioPipeline:
             impact_envelope: Envelope for percussive signals.
             energy_envelope: Envelope for continuous energy signals.
         """
-        self.target_fps = target_fps
+        self.target_fps = target_fps or 60
         self.sample_rate = sample_rate
 
         self.decomposer = AudioDecomposer(margin=hpss_margin)

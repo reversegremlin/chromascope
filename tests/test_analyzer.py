@@ -51,6 +51,13 @@ class TestFeatureAnalyzer:
         expected = sample_rate // 60
         assert hop == expected
 
+    def test_default_target_fps_if_none(self, sample_rate):
+        """FeatureAnalyzer should handle target_fps=None by using default 60."""
+        analyzer = FeatureAnalyzer(target_fps=None)
+        assert analyzer.target_fps == 60
+        hop = analyzer.compute_hop_length(sample_rate)
+        assert hop == sample_rate // 60
+
     def test_beat_detection(self, decomposed_clicks):
         """Should detect beats in click track."""
         analyzer = FeatureAnalyzer(target_fps=60)

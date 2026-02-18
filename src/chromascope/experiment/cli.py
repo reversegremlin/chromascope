@@ -127,7 +127,7 @@ def main():
     print(f"Analyzing audio: {args.audio}")
     t0 = time.time()
 
-    pipeline = AudioPipeline(target_fps=args.fps)
+    pipeline = AudioPipeline(target_fps=fps)
 
     if args.clear_cache:
         print("Clearing analysis cache...")
