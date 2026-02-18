@@ -7,17 +7,18 @@ Translates music into a field of radioactive trails:
 - Gamma: sparse flashes/speck events
 - Central Ore: Pulsating radioactive core spawning decay events.
 
-Enhanced features:
-- Slow Motion: Temporal smoothing and slower particle dynamics.
-- Secondary Ionization: Trails split and branch.
-- Vapor Distortion: Shader-like heat haze displacement.
-- Dynamic Zoom: Reactive viewport scaling.
+ULTRA-INTENSE FEATURES:
+- Quantum Fission: Core shatters into multiple sub-emitters on transients.
+- Cherenkov Radiation: High-speed blue shockwaves following beta particles.
+- Weak Force Mutation: Trails decay into other particle types mid-flight (flavor change).
+- Quantum Foam: A living, stochastic background of virtual events.
+- Spacetime Warping: Massive distortion around the core.
 """
 
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Any, Iterator, List
+from typing import Any, Iterator, List, Tuple
 
 import numpy as np
 from PIL import Image, ImageFilter, ImageDraw
@@ -41,38 +42,39 @@ class Particle:
     decay_rate: float
     thickness: float
     intensity: float
-    type: str  # "alpha", "beta", "gamma"
+    type: str  # "alpha", "beta", "gamma", "boson"
     last_x: float = 0.0
     last_y: float = 0.0
     generation: int = 0
+    mass: float = 1.0
 
 
 @dataclass
 class DecayConfig:
-    """Configuration for the decay renderer."""
+    """Configuration for the ultra-intense decay renderer."""
     width: int = 1920
     height: int = 1080
     fps: int = 60
     
     # Decay-specific
-    base_cpm: int = 10000 
-    trail_persistence: float = 0.96
-    diffusion: float = 0.08
-    ionization_gain: float = 1.5
-    style: str = "uranium"  # "lab", "uranium", "noir", "neon"
+    base_cpm: int = 15000 
+    trail_persistence: float = 0.97
+    diffusion: float = 0.1
+    ionization_gain: float = 2.0
+    style: str = "uranium"
     
     # Post-processing
     glow_enabled: bool = True
-    vignette_strength: float = 0.5
-    distortion_strength: float = 0.2
+    vignette_strength: float = 0.6
+    distortion_strength: float = 0.4
     
     # Performance
-    max_particles: int = 5000
+    max_particles: int = 8000
 
 
 class DecayRenderer:
     """
-    Renders high-intensity, chaotic decay trails with shader-like effects.
+    The ultimate expression of radioactive chaos.
     """
 
     def __init__(self, config: DecayConfig | None = None):
@@ -80,10 +82,12 @@ class DecayRenderer:
         
         # State
         self.particles: List[Particle] = []
+        self.fission_cores: List[Tuple[float, float, float]] = [] # x, y, scale
         self.time = 0.0
         
-        # Buffer (H, W) float32
+        # Buffers
         self.trail_buffer = np.zeros((self.cfg.height, self.cfg.width), dtype=np.float32)
+        self.cherenkov_buffer = np.zeros((self.cfg.height, self.cfg.width), dtype=np.float32)
         
         # Smoothed audio
         self._smooth_energy = 0.1
@@ -96,20 +100,13 @@ class DecayRenderer:
         self._smooth_sub_bass = 0.0
         self._smooth_brilliance = 0.0
 
-        # Dynamics state
+        # Dynamics
         self.drift_angle = 0.0
         self.ore_rotation = 0.0
         self.ore_scale = 1.0
         self.view_zoom = 1.0
         
-        # Distortion map (pre-calculated or dynamic)
-        self._distortion_offsets = self._init_distortion_map()
-
-    def _init_distortion_map(self):
-        """Initialize a static or base noise map for distortion."""
-        h, w = self.cfg.height, self.cfg.width
-        y, x = np.mgrid[0:h, 0:w].astype(np.float32)
-        return x, y
+        self._distortion_offsets = np.mgrid[0:self.cfg.height, 0:self.cfg.width].astype(np.float32)
 
     def _lerp(self, current: float, target: float, factor: float) -> float:
         return current + (target - current) * factor
@@ -117,9 +114,8 @@ class DecayRenderer:
     def _smooth_audio(self, frame_data: dict[str, Any]):
         """Update smoothed audio values."""
         is_beat = frame_data.get("is_beat", False)
-        # Slower smoothing for "slow-motion" feel in some channels
-        fast = 0.4 if is_beat else 0.2
-        slow = 0.06
+        fast = 0.45 if is_beat else 0.25
+        slow = 0.05
 
         self._smooth_energy = self._lerp(self._smooth_energy, frame_data.get("global_energy", 0.1), slow)
         self._smooth_percussive = self._lerp(self._smooth_percussive, frame_data.get("percussive_impact", 0.0), fast)
@@ -133,44 +129,55 @@ class DecayRenderer:
 
     def spawn_particle(self, p_type: str, x: float = None, y: float = None, 
                        vx: float = None, vy: float = None, gen: int = 0):
-        """Spawn a particle, optionally at a specific location for branching."""
         if len(self.particles) >= self.cfg.max_particles:
             return
 
-        if x is None or y is None:
-            # Spawn from Ore surface
-            center_x, center_y = self.cfg.width / 2, self.cfg.height / 2
-            base_radius = 60.0 * self.ore_scale
+        if x is None:
+            # Randomly pick a fission core or the main center
+            if self.fission_cores and random.random() < 0.7:
+                center_x, center_y, c_scale = random.choice(self.fission_cores)
+            else:
+                center_x, center_y, c_scale = self.cfg.width / 2, self.cfg.height / 2, self.ore_scale
+            
+            base_radius = 60.0 * c_scale
             spawn_angle = random.uniform(0, 2 * math.pi)
-            r = base_radius * random.uniform(0.6, 1.2)
+            r = base_radius * random.uniform(0.4, 1.3)
             x = center_x + math.cos(spawn_angle) * r
             y = center_y + math.sin(spawn_angle) * r
-            angle = spawn_angle + random.uniform(-0.5, 0.5) + self.drift_angle
+            angle = spawn_angle + random.uniform(-0.6, 0.6) + self.drift_angle
         else:
-            # Branching spawn - use provided velocity or jitter
-            angle = math.atan2(vy, vx) + random.uniform(-0.8, 0.8)
+            angle = math.atan2(vy, vx) + random.uniform(-0.4, 0.4)
 
-        # "Slow motion" velocity scaling
-        speed_scale = 0.4 + self._smooth_energy * 0.6
+        speed_scale = 0.3 + self._smooth_energy * 0.7
         
         if p_type == "alpha":
-            speed = random.uniform(1.0, 4.0) * (1.0 + self._smooth_low) * speed_scale
+            speed = random.uniform(2.0, 6.0) * (1.0 + self._smooth_low * 2) * speed_scale
             life = 1.0
-            decay_rate = random.uniform(0.015, 0.04) # Slower decay
-            thickness = random.uniform(10.0, 20.0)
-            intensity = random.uniform(0.8, 1.5)
-        elif p_type == "beta":
-            speed = random.uniform(10.0, 30.0) * (0.5 + self._smooth_centroid) * speed_scale
-            life = 1.0
-            decay_rate = random.uniform(0.005, 0.015) # Long trails
-            thickness = random.uniform(2.0, 5.0)
-            intensity = random.uniform(0.6, 1.2)
-        else: # gamma
-            speed = random.uniform(0, 5.0) * speed_scale
-            life = 1.0
-            decay_rate = 0.1
-            thickness = random.uniform(5.0, 15.0)
+            decay_rate = random.uniform(0.01, 0.03)
+            thickness = random.uniform(12.0, 25.0)
             intensity = random.uniform(1.0, 2.0)
+            mass = 4.0
+        elif p_type == "beta":
+            speed = random.uniform(30.0, 80.0) * (0.6 + self._smooth_centroid * 1.2) * speed_scale
+            life = 1.0
+            decay_rate = random.uniform(0.004, 0.012)
+            thickness = random.uniform(2.5, 6.0)
+            intensity = random.uniform(0.7, 1.4)
+            mass = 0.5
+        elif p_type == "boson":
+            speed = random.uniform(10.0, 20.0) * speed_scale
+            life = 1.0
+            decay_rate = 0.15 # Very short lived
+            thickness = random.uniform(20.0, 40.0)
+            intensity = 2.0
+            mass = 10.0
+        else: # gamma
+            speed = random.uniform(0, 20.0) * speed_scale
+            life = 1.0
+            decay_rate = 0.08
+            thickness = random.uniform(6.0, 18.0)
+            intensity = random.uniform(1.2, 2.5)
+            mass = 0.0
 
         nvx = math.cos(angle) * speed
         nvy = math.sin(angle) * speed
@@ -180,15 +187,14 @@ class DecayRenderer:
             vx=nvx, vy=nvy, 
             life=life, decay_rate=decay_rate, 
             thickness=thickness, intensity=intensity,
-            type=p_type, generation=gen
+            type=p_type, generation=gen, mass=mass
         )
         self.particles.append(p)
 
     def update_particles(self, dt: float):
-        """Move particles, update life, and handle branching."""
         new_particles = []
-        # Chaotic field from flux
-        field_power = self._smooth_flux * 10.0
+        # Weak force field strength
+        weak_force = self._smooth_flux * 15.0
         
         for p in self.particles:
             p.life -= p.decay_rate
@@ -197,99 +203,94 @@ class DecayRenderer:
                 p.x += p.vx
                 p.y += p.vy
                 
-                # Magnetic/Chaos deviation
-                drift = (math.sin(self.time * 2 + p.x * 0.01) * field_power)
-                p.vx += drift * 0.1
-                p.vy += math.cos(self.time * 1.5 + p.y * 0.01) * field_power * 0.1
+                # Weak Force Mutation (Flavor Change)
+                # Alpha decays into multiple Betas
+                if p.type == "alpha" and p.life < 0.5 and random.random() < 0.05:
+                    for _ in range(3):
+                        self.spawn_particle("beta", p.x, p.y, p.vx, p.vy, p.generation + 1)
+                    continue # Alpha is gone
                 
-                # Secondary Ionization (Branching)
-                # High energy and flux trigger splits
-                if p.generation < 2 and random.random() < (0.02 * self._smooth_energy * self._smooth_flux):
-                    self.spawn_particle(p.type, p.x, p.y, p.vx, p.vy, p.generation + 1)
+                # Boson creates Beta explosion
+                if p.type == "boson" and p.life < 0.2:
+                    for _ in range(8):
+                        self.spawn_particle("beta", p.x, p.y, random.uniform(-1,1), random.uniform(-1,1))
+                    continue
+
+                # Chaotic deviation
+                p.vx += (math.sin(self.time * 5 + p.y * 0.02) * weak_force * 0.2)
+                p.vy += (math.cos(self.time * 4 + p.x * 0.02) * weak_force * 0.2)
                 
                 # Drag
-                p.vx *= 0.99
-                p.vy *= 0.99
+                p.vx *= 0.985
+                p.vy *= 0.985
                 new_particles.append(p)
         self.particles = new_particles
 
-    def _draw_ore(self, draw: ImageDraw.Draw, center: tuple[float, float], scale: float):
-        """Draw the chaotic central ore core."""
+    def _draw_fission_ore(self, draw: ImageDraw.Draw, center: tuple[float, float], scale: float, rot_offset: float):
         cx, cy = center
-        # More points for a "shattered" look
-        num_points = 24
+        num_points = 18
         points = []
         for i in range(num_points):
-            angle = i * (2 * math.pi / num_points) + self.ore_rotation
-            # Chaos radius
-            r_noise = random.uniform(-20, 20) * (self._smooth_flux + self._smooth_brilliance)
-            r = (70.0 + r_noise) * scale
+            angle = i * (2 * math.pi / num_points) + self.ore_rotation + rot_offset
+            r = (50.0 + random.uniform(-15, 15) * self._smooth_flux) * scale
             points.append((cx + math.cos(angle) * r, cy + math.sin(angle) * r))
         
-        draw.polygon(points, fill=0.9 + self._smooth_sub_bass * 0.3)
-        
-        # Internal crackling
-        for _ in range(8):
-            hx = cx + random.uniform(-40, 40) * scale
-            hy = cy + random.uniform(-40, 40) * scale
-            hr = random.uniform(2, 25) * scale * (0.8 + self._smooth_brilliance)
+        draw.polygon(points, fill=0.8 + self._smooth_brilliance * 0.4)
+        # Hot spots
+        for _ in range(3):
+            hx = cx + random.uniform(-20, 20) * scale
+            hy = cy + random.uniform(-20, 20) * scale
+            hr = random.uniform(5, 20) * scale
             draw.ellipse([hx-hr, hy-hr, hx+hr, hy+hr], fill=1.0)
 
-    def _apply_vapor_distortion(self, buffer: np.ndarray) -> np.ndarray:
-        """Apply a 'shader-like' heat haze distortion."""
-        h, w = buffer.shape
-        strength = self.cfg.distortion_strength * (1.0 + self._smooth_flux * 3.0)
-        
-        if strength <= 0.01:
-            return buffer
-            
-        # Create displacement field
-        t = self.time * 3.0
-        # Low frequency "wobble"
-        dx = np.sin(t + np.linspace(0, 10, w)) * strength * 10
-        dy = np.cos(t * 1.2 + np.linspace(0, 10, h)) * strength * 10
-        
-        # Using map_coordinates for high-quality displacement
-        # This is a bit slow on CPU but looks very "shader-y"
-        grid_x, grid_y = self._distortion_offsets
-        # Add dynamic wobble to grid
-        # We'll just shift the coordinates
-        distorted_coords = np.array([
-            grid_y + dy[:, None],
-            grid_x + dx[None, :]
-        ])
-        
-        distorted = map_coordinates(buffer, distorted_coords, order=1, mode='reflect')
-        return distorted
+    def _apply_quantum_foam(self, buffer: np.ndarray):
+        """Add virtual particle noise (Quantum Foam)."""
+        foam = np.random.poisson(0.001 * (1.0 + self._smooth_energy * 5), buffer.shape).astype(np.float32)
+        return np.maximum(buffer, foam)
 
-    def _apply_styles(self, buffer: np.ndarray) -> np.ndarray:
-        """Apply color palettes with spectral shifts."""
-        # buffer is (H, W) float32
+    def _apply_vapor_distortion(self, buffer: np.ndarray) -> np.ndarray:
+        h, w = buffer.shape
+        strength = self.cfg.distortion_strength * (1.0 + self._smooth_flux * 4.0 + self._smooth_sub_bass * 2.0)
+        if strength <= 0.02: return buffer
+        
+        t = self.time * 4.0
+        # Multi-scale distortion
+        dx = (np.sin(t + np.linspace(0, 15, w)) * strength * 12 + 
+              np.sin(t*2 + np.linspace(0, 40, w)) * strength * 4)
+        dy = (np.cos(t*1.3 + np.linspace(0, 15, h)) * strength * 12 + 
+              np.cos(t*2.5 + np.linspace(0, 40, h)) * strength * 4)
+        
+        y, x = self._distortion_offsets
+        coords = np.array([y + dy[:, None], x + dx[None, :]])
+        return map_coordinates(buffer, coords, order=1, mode='reflect')
+
+    def _apply_styles(self, buffer: np.ndarray, cherenkov: np.ndarray) -> np.ndarray:
         style = self.cfg.style
         
         if style == "uranium":
-            r = buffer * 0.2
+            # Uncanny spectral uranium: emerald green + violet fringes
+            r = buffer * 0.2 + cherenkov * 0.4
             g = buffer * 1.0
-            b = buffer * (0.1 + self._smooth_brilliance * 0.5)
-            # Add plasma-heat core
+            b = buffer * 0.1 + cherenkov * 1.0
+            
+            # Plasma core
             y, x = np.ogrid[:self.cfg.height, :self.cfg.width]
-            dist = np.sqrt((x - self.cfg.width/2)**2 + (y - self.cfg.height/2)**2)
-            glow = np.exp(-dist / (80.0 * self.ore_scale * self.view_zoom))
-            r = np.maximum(r, buffer * glow * 1.2)
+            for cx, cy, cs in ([(self.cfg.width/2, self.cfg.height/2, self.ore_scale)] + self.fission_cores):
+                dist = np.sqrt((x - cx)**2 + (y - cy)**2)
+                glow = np.exp(-dist / (90.0 * cs * self.view_zoom))
+                r = np.maximum(r, buffer * glow * 1.5)
+                b = np.maximum(b, buffer * glow * 0.8)
+            
             rgb = np.stack([r, g, b], axis=-1)
         elif style == "neon":
-            # Fast spectral cycling on peaks
-            shift = self.time * 1.0 + self._smooth_flux * 5.0
-            r = buffer * (0.5 + 0.5 * math.sin(shift))
-            g = buffer * (0.5 + 0.5 * math.cos(shift * 0.8))
-            b = buffer * (0.8 + self._smooth_sub_bass)
+            shift = self.time * 2.0 + self._smooth_flux * 8.0
+            r = buffer * (0.6 + 0.4 * math.sin(shift)) + cherenkov * 0.5
+            g = buffer * (0.3 + 0.3 * math.cos(shift * 0.7))
+            b = buffer * 0.8 + cherenkov * 1.0
             rgb = np.stack([r, g, b], axis=-1)
-        elif style == "noir":
-            # Extreme contrast
-            b2 = np.power(buffer, 1.6)
-            rgb = np.stack([b2, b2, b2], axis=-1)
-        else: # lab
-            rgb = np.stack([buffer, buffer, buffer], axis=-1)
+        else: # noir
+            val = np.power(buffer + cherenkov * 0.5, 1.5)
+            rgb = np.stack([val, val, val], axis=-1)
             
         return (np.clip(rgb, 0, 1) * 255).astype(np.uint8)
 
@@ -298,122 +299,127 @@ class DecayRenderer:
         frame_data: dict[str, Any],
         frame_index: int,
     ) -> np.ndarray:
-        """Render a single high-chaos frame."""
         cfg = self.cfg
         dt = 1.0 / cfg.fps
         self.time += dt
         self._smooth_audio(frame_data)
         
-        # Dynamic Viewport State
-        self.ore_rotation += (0.05 + self._smooth_flux * 0.8)
-        self.ore_scale = self._lerp(self.ore_scale, 1.0 + self._smooth_sub_bass * 2.0, 0.4)
-        self.drift_angle += (self._smooth_centroid - 0.5) * dt * 8.0
-        
-        # Zoom reactive to sub-bass and global energy
-        target_zoom = 1.0 + self._smooth_sub_bass * 0.3 + math.sin(self.time * 0.5) * 0.1
-        self.view_zoom = self._lerp(self.view_zoom, target_zoom, 0.1)
+        # Quantum Fission Logic
+        if frame_data.get("is_beat", False) and self._smooth_sub_bass > 0.6:
+            # Core Shatters
+            self.fission_cores = []
+            num_fragments = random.randint(2, 5)
+            for _ in range(num_fragments):
+                fx = cfg.width / 2 + random.uniform(-200, 200) * self._smooth_sub_bass
+                fy = cfg.height / 2 + random.uniform(-200, 200) * self._smooth_sub_bass
+                fs = random.uniform(0.3, 0.7) * self.ore_scale
+                self.fission_cores.append((fx, fy, fs))
+        else:
+            # Fragments re-merge
+            new_cores = []
+            for cx, cy, cs in self.fission_cores:
+                nx = self._lerp(cx, cfg.width / 2, 0.1)
+                ny = self._lerp(cy, cfg.height / 2, 0.1)
+                new_cores.append((nx, ny, cs * 0.98))
+            self.fission_cores = [c for c in new_cores if c[2] > 0.1]
 
-        # 1. Spawning - CRANKED
-        cpm = cfg.base_cpm * (1.0 + self._smooth_energy * 6.0 + self._smooth_flux * 10.0)
+        self.ore_rotation += (0.06 + self._smooth_flux * 1.2)
+        self.ore_scale = self._lerp(self.ore_scale, 1.0 + self._smooth_sub_bass * 1.8, 0.4)
+        self.drift_angle += (self._smooth_centroid - 0.5) * dt * 12.0
+        self.view_zoom = self._lerp(self.view_zoom, 1.0 + self._smooth_sub_bass * 0.4 + self._smooth_flux * 0.2, 0.15)
+
+        # 1. Spawning - ABSOLUTE CHAOS
+        cpm = cfg.base_cpm * (1.0 + self._smooth_energy * 8.0 + self._smooth_flux * 15.0)
         spawn_prob = (cpm / 60.0) * dt
         num_spawns = np.random.poisson(spawn_prob)
         
         if frame_data.get("is_beat", False):
-            num_spawns += int(100 * self._smooth_percussive * cfg.ionization_gain)
+            num_spawns += int(150 * self._smooth_percussive * cfg.ionization_gain)
+            # Spawn a Boson carrier on beats
+            self.spawn_particle("boson")
 
-        total_energy = self._smooth_low + self._smooth_high + 1e-6
-        alpha_prob = self._smooth_low / total_energy
-        
+        alpha_prob = self._smooth_low / (self._smooth_low + self._smooth_high + 1e-6)
         for _ in range(num_spawns):
             r = random.random()
-            if r < alpha_prob * 0.6:
-                self.spawn_particle("alpha")
-            elif r < 0.93:
-                self.spawn_particle("beta")
-            else:
-                self.spawn_particle("gamma")
+            if r < alpha_prob * 0.5: self.spawn_particle("alpha")
+            elif r < 0.9: self.spawn_particle("beta")
+            else: self.spawn_particle("gamma")
 
-        # 2. Update buffer with Persistence
-        p_fade = cfg.trail_persistence * (1.0 - self._smooth_flux * 0.05)
+        # 2. Buffers
+        p_fade = cfg.trail_persistence * (1.0 - self._smooth_flux * 0.08)
         self.trail_buffer *= p_fade
+        self.cherenkov_buffer *= (p_fade * 0.9) # Faster fade for shockwaves
         
-        # Diffusion pulses
         if cfg.diffusion > 0:
-            sigma = cfg.diffusion * 8 * (0.5 + self._smooth_energy)
+            sigma = cfg.diffusion * 10 * (0.4 + self._smooth_energy)
             self.trail_buffer = gaussian_filter(self.trail_buffer, sigma=sigma)
 
         # 3. Draw
         self.update_particles(dt)
         
-        # Scaling coordinates for Zoom
-        # We can simulate zoom by drawing everything shifted/scaled
-        # But for simplicity, we'll draw to a temp image and then transform
         deposit_img = Image.new("F", (cfg.width, cfg.height), 0.0)
+        cherenkov_img = Image.new("F", (cfg.width, cfg.height), 0.0)
         draw = ImageDraw.Draw(deposit_img)
+        draw_c = ImageDraw.Draw(cherenkov_img)
         
-        center_x, center_y = cfg.width / 2, cfg.height / 2
+        cx, cy = cfg.width / 2, cfg.height / 2
         
-        # Draw Ore
-        self._draw_ore(draw, (center_x, center_y), self.ore_scale)
+        # Draw Main Ore
+        self._draw_fission_ore(draw, (cx, cy), self.ore_scale, 0)
+        # Draw Fragments
+        for fx, fy, fs in self.fission_cores:
+            self._draw_fission_ore(draw, (fx, fy), fs, fx * 0.01)
         
-        # Draw Particles
         for p in self.particles:
-            # Scale intensity and thickness by life and flux
-            f_boost = (1.0 + self._smooth_flux * 1.5)
+            f_boost = (1.0 + self._smooth_flux * 2.0)
             color = float(p.intensity * p.life * f_boost)
-            thickness = int(p.thickness * (0.7 + p.life * 0.3) * f_boost)
+            thickness = int(p.thickness * (0.6 + p.life * 0.4) * f_boost)
             
-            # Simple zoom implementation: transform points
             def transform(px, py):
-                return (
-                    center_x + (px - center_x) * self.view_zoom,
-                    center_y + (py - center_y) * self.view_zoom
-                )
+                return (cx + (px - cx) * self.view_zoom, cy + (py - cy) * self.view_zoom)
 
             tx, ty = transform(p.x, p.y)
             tlx, tly = transform(p.last_x, p.last_y)
 
             if p.type == "gamma":
-                draw.ellipse([tx - thickness, ty - thickness, 
-                              tx + thickness, ty + thickness], 
-                             fill=color)
+                draw.ellipse([tx - thickness, ty - thickness, tx + thickness, ty + thickness], fill=color)
             else:
                 draw.line([(tlx, tly), (tx, ty)], fill=color, width=thickness)
-        
-        # Accumulate
-        current_frame_buffer = np.array(deposit_img)
-        
-        # 4. Vapor Distortion "Shader"
-        current_frame_buffer = self._apply_vapor_distortion(current_frame_buffer)
-        
-        self.trail_buffer = np.maximum(self.trail_buffer, current_frame_buffer)
+                # Cherenkov Shockwave for high-speed Beta
+                if p.type == "beta" and (p.vx**2 + p.vy**2) > 2000:
+                    draw_c.line([(tlx, tly), (tx, ty)], fill=color * 0.8, width=thickness * 3)
 
-        # 5. Grading and Post
-        rgb = self._apply_styles(self.trail_buffer)
+        # Accumulate & Shader
+        current_dep = self._apply_vapor_distortion(np.array(deposit_img))
+        current_cher = self._apply_vapor_distortion(np.array(cherenkov_img))
+        
+        self.trail_buffer = np.maximum(self.trail_buffer, current_dep)
+        self.cherenkov_buffer = np.maximum(self.cherenkov_buffer, current_cher)
+        
+        # Quantum Foam background
+        self.trail_buffer = self._apply_quantum_foam(self.trail_buffer)
+
+        # 4. Grading
+        rgb = self._apply_styles(self.trail_buffer, self.cherenkov_buffer)
         
         if cfg.glow_enabled:
-            # Massive bloom
-            g_int = 0.5 + self._smooth_flux * 0.8 + self._smooth_sub_bass * 0.5
-            rgb = add_glow(rgb, intensity=min(g_int, 0.99), radius=22)
+            g_int = 0.55 + self._smooth_flux * 1.0 + self._smooth_sub_bass * 0.6
+            rgb = add_glow(rgb, intensity=min(g_int, 0.99), radius=25)
             
         if cfg.vignette_strength > 0:
-            v_str = cfg.vignette_strength * (1.5 + self._smooth_sub_bass * 2.0)
+            v_str = cfg.vignette_strength * (1.8 + self._smooth_sub_bass * 2.5)
             rgb = vignette(rgb, strength=v_str)
             
         return tone_map_soft(rgb)
 
-    def render_manifest(
-        self,
-        manifest: dict[str, Any],
-        progress_callback: callable = None,
-    ) -> Iterator[np.ndarray]:
-        """Render manifest with full chaos."""
+    def render_manifest(self, manifest: dict[str, Any], progress_callback: callable = None) -> Iterator[np.ndarray]:
         frames = manifest.get("frames", [])
         total = len(frames)
-        
         # Reset State
         self.particles = []
+        self.fission_cores = []
         self.trail_buffer = np.zeros((self.cfg.height, self.cfg.width), dtype=np.float32)
+        self.cherenkov_buffer = np.zeros((self.cfg.height, self.cfg.width), dtype=np.float32)
         self.time = 0.0
         self.drift_angle = 0.0
         self.ore_rotation = 0.0
@@ -423,6 +429,4 @@ class DecayRenderer:
         for i, frame_data in enumerate(frames):
             frame = self.render_frame(frame_data, i)
             yield frame
-
-            if progress_callback:
-                progress_callback(i + 1, total)
+            if progress_callback: progress_callback(i + 1, total)
