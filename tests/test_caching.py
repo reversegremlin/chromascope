@@ -91,3 +91,30 @@ def test_clear_cache(tmp_path, monkeypatch):
     
     # Directory should be empty (recreated but empty)
     assert len(list(tmp_path.glob("*"))) == 0
+
+
+def test_cache_invalidation_on_version_change(temp_audio_file, tmp_path, monkeypatch):
+    """Test that changing ANALYSIS_VERSION invalidates the cache."""
+    monkeypatch.setattr(AudioPipeline, "_get_cache_dir", lambda self: tmp_path)
+    
+    # 1. Run with current version
+    pipeline1 = AudioPipeline(target_fps=60)
+    pipeline1.process(temp_audio_file)
+    
+    files_initial = list(tmp_path.glob("*.json"))
+    assert len(files_initial) == 1
+    initial_cache_file = files_initial[0]
+    
+    # 2. Mock a version change in the class
+    monkeypatch.setattr(AudioPipeline, "ANALYSIS_VERSION", "9.9-test")
+    
+    pipeline2 = AudioPipeline(target_fps=60)
+    # This should result in a cache MISS and call decompose
+    with patch.object(pipeline2, 'decompose', wraps=pipeline2.decompose) as mock_decompose:
+        pipeline2.process(temp_audio_file)
+        assert mock_decompose.called
+        
+    # Should be 2 files total now
+    files_final = list(tmp_path.glob("*.json"))
+    assert len(files_final) == 2
+    assert initial_cache_file in files_final

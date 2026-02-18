@@ -29,6 +29,11 @@ class AudioPipeline:
     and export into a single unified interface.
     """
 
+    # Version of the analysis logic/schema.
+    # Increment this whenever the feature extraction or polishing logic changes
+    # to ensure that cached manifests are invalidated and re-generated.
+    ANALYSIS_VERSION = "1.1"
+
     def __init__(
         self,
         target_fps: int = 60,
@@ -82,6 +87,7 @@ class AudioPipeline:
         energy = self.polisher.energy_envelope
         
         config = {
+            "version": self.ANALYSIS_VERSION,
             "fps": self.target_fps,
             "sr": self.sample_rate,
             "margin": self.decomposer.margin,
