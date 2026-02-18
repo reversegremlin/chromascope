@@ -42,6 +42,8 @@ def render_video(
     max_sides: int = 12,
     config: dict = None,
     quality: str = "high",
+    use_cache: bool = True,
+    clear_cache: bool = False,
 ):
     """
     Render kaleidoscope video from audio file.
@@ -70,6 +72,8 @@ def render_video(
         max_sides: Maximum polygon sides.
         config: Full frontend config dict (overrides individual params).
         quality: Encoding quality profile ("high", "medium", or "fast").
+        use_cache: Whether to use cached analysis.
+        clear_cache: Whether to clear cache before running.
     """
     from chromascope.pipeline import AudioPipeline
 
@@ -87,15 +91,16 @@ def render_video(
         else:
             print(f"{pct_clamped:3d}% {msg}", flush=True)
 
-        if progress_callback:
-            progress_callback(pct_clamped, msg)
-
     report_progress(0, f"Processing audio: {audio_path}")
 
     # Step 1: Analyze audio
+    if clear_cache:
+        report_progress(2, "Clearing cache...")
+        AudioPipeline().clear_cache()
+
     report_progress(5, "Analyzing audio...")
     pipeline = AudioPipeline(target_fps=fps)
-    result = pipeline.process(audio_path)
+    result = pipeline.process(audio_path, use_cache=use_cache)
     manifest = result["manifest"]
 
     report_progress(10, f"Detected BPM: {result['bpm']:.1f}, Duration: {result['duration']:.2f}s")
@@ -413,6 +418,10 @@ def main():
              "(overrides individual visual params)",
     )
 
+    # Caching
+    parser.add_argument("--no-cache", action="store_true", help="Force re-analysis of audio")
+    parser.add_argument("--clear-cache", action="store_true", help="Clear the analysis cache before running")
+
     args = parser.parse_args()
 
     if not args.audio.exists():
@@ -464,6 +473,8 @@ def main():
         style=args.style,
         quality=args.quality,
         config=config,
+        use_cache=not args.no_cache,
+        clear_cache=args.clear_cache,
     )
 
 

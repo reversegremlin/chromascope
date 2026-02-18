@@ -89,7 +89,11 @@ def main():
         help="Limit output to N seconds",
     )
 
-    # Quality (can still be overridden manually if needed)
+    # Caching
+    parser.add_argument("--no-cache", action="store_true", help="Force re-analysis of audio")
+    parser.add_argument("--clear-cache", action="store_true", help="Clear the analysis cache before running")
+
+    # Quality
     parser.add_argument(
         "-q", "--quality", type=str, default=None,
         choices=["high", "medium", "fast"],
@@ -123,8 +127,13 @@ def main():
     print(f"Analyzing audio: {args.audio}")
     t0 = time.time()
 
-    pipeline = AudioPipeline(target_fps=fps)
-    result = pipeline.process(args.audio)
+    pipeline = AudioPipeline(target_fps=args.fps)
+
+    if args.clear_cache:
+        print("Clearing analysis cache...")
+        pipeline.clear_cache()
+
+    result = pipeline.process(args.audio, use_cache=not args.no_cache)
     manifest = result["manifest"]
 
     print(f"  BPM: {result['bpm']:.1f}")

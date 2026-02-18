@@ -4,6 +4,10 @@ Main audio analysis pipeline.
 Orchestrates the complete flow from audio file to visual driver manifest.
 """
 
+import hashlib
+import json
+import os
+import shutil
 from pathlib import Path
 from typing import Any, Union
 
@@ -54,6 +58,53 @@ class AudioPipeline:
             energy_envelope=energy_envelope,
         )
         self.exporter = ManifestExporter()
+
+    def _get_cache_dir(self) -> Path:
+        """Return the directory for caching manifests."""
+        # Use ~/.cache/chromascope/manifests
+        cache_dir = Path.home() / ".cache" / "chromascope" / "manifests"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
+
+    def _calculate_file_hash(self, file_path: Path) -> str:
+        """Calculate SHA256 hash of the file."""
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            # Read in chunks to handle large files
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
+    def _get_config_hash(self) -> str:
+        """Calculate hash of the pipeline configuration."""
+        # Extract envelope params safely
+        impact = self.polisher.impact_envelope
+        energy = self.polisher.energy_envelope
+        
+        config = {
+            "fps": self.target_fps,
+            "sr": self.sample_rate,
+            "margin": self.decomposer.margin,
+            "impact": (impact.attack_ms, impact.release_ms) if impact else None,
+            "energy": (energy.attack_ms, energy.release_ms) if energy else None,
+        }
+        return hashlib.md5(json.dumps(config, sort_keys=True).encode("utf-8")).hexdigest()
+
+    def _get_cache_path(self, audio_path: Path) -> Path:
+        """Get the cache file path for a given audio file."""
+        file_hash = self._calculate_file_hash(audio_path)
+        config_hash = self._get_config_hash()
+        
+        # Filename includes file content hash and config hash
+        filename = f"manifest_{file_hash}_{config_hash}.json"
+        return self._get_cache_dir() / filename
+
+    def clear_cache(self):
+        """Clear the manifest cache."""
+        cache_dir = self._get_cache_dir()
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir)
+            cache_dir.mkdir(parents=True, exist_ok=True)
 
     def decompose(self, audio_path: Union[str, Path]) -> DecomposedAudio:
         """
@@ -121,6 +172,7 @@ class AudioPipeline:
         audio_path: Union[str, Path],
         output_path: Union[str, Path] | None = None,
         format: str = "json",
+        use_cache: bool = True,
     ) -> dict[str, Any]:
         """
         Run the complete pipeline from audio file to manifest.
@@ -129,11 +181,43 @@ class AudioPipeline:
             audio_path: Path to input audio file.
             output_path: Path for output manifest. If None, only returns dict.
             format: Output format ("json" or "numpy").
+            use_cache: Whether to use cached manifest if available.
 
         Returns:
             Dictionary containing manifest data and processing info.
         """
         audio_path = Path(audio_path)
+
+        # Caching logic
+        if use_cache:
+            try:
+                cache_path = self._get_cache_path(audio_path)
+                if cache_path.exists():
+                    with open(cache_path, "r", encoding="utf-8") as f:
+                        manifest = json.load(f)
+
+                    # Reconstruct result dict
+                    metadata = manifest.get("metadata", {})
+                    print(f"Loaded analysis from cache: {cache_path}")
+
+                    result = {
+                        "manifest": manifest,
+                        "bpm": metadata.get("bpm", 0.0),
+                        "duration": metadata.get("duration", 0.0),
+                        "n_frames": metadata.get("n_frames", 0),
+                        "fps": self.target_fps,
+                    }
+
+                    if output_path:
+                        # If output path requested, write the cached manifest to it
+                        with open(output_path, "w", encoding="utf-8") as f:
+                            json.dump(manifest, f, indent=2)
+                        result["output_path"] = str(output_path)
+
+                    return result
+            except Exception as e:
+                print(f"Failed to load cache: {e}. Re-analyzing.")
+                # Fall through to normal processing
 
         # Phase A: Decompose
         decomposed = self.decompose(audio_path)
@@ -150,6 +234,15 @@ class AudioPipeline:
             bpm=features.temporal.bpm,
             duration=decomposed.duration,
         )
+
+        # Save to cache if enabled
+        if use_cache:
+            try:
+                cache_path = self._get_cache_path(audio_path)
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump(manifest, f, indent=2)
+            except Exception as e:
+                print(f"Failed to save cache: {e}")
 
         # Phase D: Export if path provided
         result = {
