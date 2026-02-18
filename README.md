@@ -19,6 +19,7 @@ Audio File → Analysis Pipeline → Visual Driver Manifest → Kaleidoscope Vid
 ## What It Does
 
 This engine tries to *understand* the character of music by separating **percussive transients** (drums, attacks) from **harmonic textures** (melodies, chords). 
+
 ### Feature Extraction
 
 | Feature | Description | Visual Application |
@@ -27,9 +28,13 @@ This engine tries to *understand* the character of music by separating **percuss
 | **Beat Tracking** | Global BPM and beat timestamps | Sync animations to rhythm |
 | **Onset Detection** | Identifies note attacks and transients | Trigger visual events |
 | **RMS Energy** | Volume envelope (global + per-component) | Drive scale/intensity |
-| **Frequency Bands** | Low (bass), Mid (vocals), High (cymbals) | Multi-band reactivity |
+| **Spectral Flux** | Measures spectral change/novelty | Pulse and impact intensity |
+| **7-Band EQ** | Sub-Bass, Bass, Low-Mid, Mid, High-Mid, Presence, Brilliance | Granular multi-band reactivity |
 | **Chroma Features** | 12-bin pitch intensity (C, C#, D...) | Color mapping |
 | **Spectral Centroid** | "Brightness" of the sound | Shape complexity |
+| **Spectral Flatness** | "Noisiness" or texture of the sound | Particle density/noise |
+| **Spectral Rolloff** | Bandwidth or "height" of the spectrum | Vertical scale/extension |
+| **Zero Crossing Rate** | High-frequency activity and noisiness | Jitter and grain effects |
 
 ### The Kaleidoscope Visualizer
 
@@ -159,8 +164,8 @@ alongside the analysis pipeline.
     "duration": 180.0,
     "fps": 60,
     "n_frames": 10800,
-    "version": "1.0",
-    "schema_version": "1.0"
+    "version": "1.1",
+    "schema_version": "1.1"
   },
   "frames": [
     {
@@ -172,10 +177,20 @@ alongside the analysis pipeline.
       "percussive_impact": 0.85,
       "harmonic_energy": 0.42,
       "global_energy": 0.65,
-      "low_energy": 0.72,
-      "mid_energy": 0.58,
-      "high_energy": 0.31,
+      "spectral_flux": 0.72,
+      
+      "sub_bass": 0.88,
+      "bass": 0.75,
+      "low_mid": 0.44,
+      "mid": 0.32,
+      "high_mid": 0.15,
+      "presence": 0.08,
+      "brilliance": 0.02,
+
       "spectral_brightness": 0.44,
+      "spectral_flatness": 0.22,
+      "spectral_rolloff": 0.55,
+      "zero_crossing_rate": 0.12,
 
       "dominant_chroma": "G#",
       "chroma_values": {
@@ -187,7 +202,8 @@ alongside the analysis pipeline.
       "fluidity": 0.42,
       "brightness": 0.44,
       "pitch_hue": 0.73,
-      "texture": 0.45
+      "texture": 0.45,
+      "sharpness": 0.64
     }
   ]
 }
@@ -199,7 +215,7 @@ alongside the analysis pipeline.
 src/chromascope/
 ├── core/
 │   ├── decomposer.py   # HPSS separation (harmonic/percussive)
-│   ├── analyzer.py     # Feature extraction (beats, energy, chroma)
+│   ├── analyzer.py     # Advanced feature extraction
 │   └── polisher.py     # Envelope smoothing & normalization
 ├── io/
 │   └── exporter.py     # JSON/NumPy manifest export
@@ -294,11 +310,11 @@ pytest tests/ --cov=src/chromascope --cov-report=term-missing
 
 ### Test Coverage
 
-The test suite includes 52 tests covering:
+The test suite includes 37 core tests covering:
 - HPSS decomposition accuracy
-- Feature extraction validation
+- Advanced feature extraction (Spectral flux, 7-band EQ, Tonality)
 - Envelope smoothing behavior
-- Manifest schema compliance
+- Manifest schema version 1.1 compliance
 - Full pipeline integration
 
 ## Use Cases

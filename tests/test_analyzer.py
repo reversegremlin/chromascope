@@ -84,6 +84,7 @@ class TestFeatureAnalyzer:
         assert len(result.energy.rms) > 0
         assert len(result.energy.rms_harmonic) > 0
         assert len(result.energy.rms_percussive) > 0
+        assert len(result.energy.spectral_flux) > 0
 
     def test_frequency_bands(self, decomposed_mixed):
         """Frequency bands should be extracted."""
@@ -92,8 +93,19 @@ class TestFeatureAnalyzer:
 
         bands = result.energy.frequency_bands
         assert isinstance(bands, FrequencyBands)
-        assert len(bands.low) > 0
+        
+        # New 7-band system
+        assert len(bands.sub_bass) > 0
+        assert len(bands.bass) > 0
+        assert len(bands.low_mid) > 0
         assert len(bands.mid) > 0
+        assert len(bands.high_mid) > 0
+        assert len(bands.presence) > 0
+        assert len(bands.brilliance) > 0
+        
+        # Legacy bands
+        assert len(bands.low) > 0
+        assert len(bands.mid_aggregate) > 0
         assert len(bands.high) > 0
 
     def test_chroma_features(self, decomposed_sine):
@@ -105,13 +117,20 @@ class TestFeatureAnalyzer:
         assert result.tonality.chroma.shape[0] == 12
         assert result.tonality.chroma.shape[1] == result.n_frames
 
-    def test_spectral_centroid(self, decomposed_mixed):
-        """Spectral centroid should be computed."""
+    def test_spectral_features(self, decomposed_mixed):
+        """Spectral characteristics should be computed."""
         analyzer = FeatureAnalyzer(target_fps=60)
         result = analyzer.analyze(decomposed_mixed)
 
         assert len(result.tonality.spectral_centroid) == result.n_frames
+        assert len(result.tonality.spectral_flatness) == result.n_frames
+        assert len(result.tonality.spectral_rolloff) == result.n_frames
+        assert len(result.tonality.zero_crossing_rate) == result.n_frames
+        
         assert np.all(result.tonality.spectral_centroid >= 0)
+        assert np.all(result.tonality.spectral_flatness >= 0)
+        assert np.all(result.tonality.spectral_rolloff >= 0)
+        assert np.all(result.tonality.zero_crossing_rate >= 0)
 
     def test_dominant_chroma(self, decomposed_sine):
         """Should identify dominant chroma per frame."""

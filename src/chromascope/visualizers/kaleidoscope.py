@@ -6,6 +6,8 @@ Maps audio features to geometric transformations:
 - Harmonic Energy → Rotation & Orbit speed
 - Spectral Centroid → Polygon complexity (sides)
 - Chroma → Hue/Color
+- Spectral Flatness → Particle jitter/noise
+- 7-Band EQ → Layered background dynamics
 """
 
 import colorsys
@@ -102,6 +104,11 @@ class KaleidoscopeRenderer:
         self.smoothed_percussive = 0.0
         self.smoothed_harmonic = 0.3
         self.smoothed_brightness = 0.5
+        self.smoothed_flatness = 0.0
+        self.smoothed_flux = 0.0
+        self.smoothed_sharpness = 0.0
+        self.smoothed_sub_bass = 0.0
+        self.smoothed_brilliance = 0.0
 
     def _init_particles(self) -> list[dict]:
         """Initialize background particles."""
@@ -115,7 +122,8 @@ class KaleidoscopeRenderer:
                 'speed': random.random() * 0.5 + 0.1,
                 'angle': random.random() * math.pi * 2,
                 'brightness': random.random() * 0.5 + 0.3,
-                'pulse': random.random() * math.pi * 2
+                'pulse': random.random() * math.pi * 2,
+                'jitter': 0.0
             })
         return particles
 
@@ -177,8 +185,8 @@ class KaleidoscopeRenderer:
         width, height = cfg.width, cfg.height
         reactivity = cfg.bg_reactivity
 
-        # Update gradient angle
-        self.gradient_angle += 0.002 * (1 + self.smoothed_harmonic)
+        # Update gradient angle, influenced by brilliance
+        self.gradient_angle += 0.002 * (1 + self.smoothed_harmonic + self.smoothed_brilliance * 2)
 
         # Update pulse intensity
         is_beat = frame_data.get("is_beat", False)
@@ -190,7 +198,8 @@ class KaleidoscopeRenderer:
         # Calculate gradient blend
         blend_phase = math.sin(self.gradient_angle * 2) * 0.5 + 0.5
         energy_blend = self.smoothed_harmonic * reactivity
-        blend = blend_phase * 0.3 + energy_blend * 0.4
+        # Sub-bass influences the depth of the color blend
+        blend = blend_phase * (0.3 - self.smoothed_sub_bass * 0.1) + energy_blend * 0.4
 
         # Interpolate background colors
         c1 = cfg.background_color
@@ -201,20 +210,25 @@ class KaleidoscopeRenderer:
             int(c1[2] + (c2[2] - c1[2]) * blend),
         )
 
-        # Add brightness boost on beats
-        brightness_boost = int(self.pulse_intensity * 30 * reactivity)
+        # Add brightness boost on beats, influenced by spectral flux
+        flux_boost = self.smoothed_flux * 20 * reactivity
+        brightness_boost = int(self.pulse_intensity * 30 * reactivity + flux_boost)
         boosted_color = (
-            min(255, mid_color[0] + brightness_boost),
-            min(255, mid_color[1] + brightness_boost),
-            min(255, mid_color[2] + brightness_boost),
+            min(255, max(0, mid_color[0] + brightness_boost)),
+            min(255, max(0, mid_color[1] + brightness_boost)),
+            min(255, max(0, mid_color[2] + brightness_boost)),
         )
 
         # Create gradient effect using concentric circles
-        center_x = width // 2 + int(math.sin(self.gradient_angle * 3) * width * 0.1 * reactivity)
-        center_y = height // 2 + int(math.cos(self.gradient_angle * 2) * height * 0.1 * reactivity)
+        # Jitter the center based on zero crossing rate
+        zcr_jitter = self.smoothed_flatness * 50 * reactivity
+        import random
+        center_x = width // 2 + int(math.sin(self.gradient_angle * 3) * width * 0.1 * reactivity) + int((random.random() - 0.5) * zcr_jitter)
+        center_y = height // 2 + int(math.cos(self.gradient_angle * 2) * height * 0.1 * reactivity) + int((random.random() - 0.5) * zcr_jitter)
 
         # Draw radial gradient approximation
-        max_radius = int(max(width, height) * 0.9 + self.pulse_intensity * 200 * reactivity)
+        # Sub-bass expands the background radius
+        max_radius = int(max(width, height) * (0.9 + self.smoothed_sub_bass * 0.2) + self.pulse_intensity * 200 * reactivity)
         steps = 20
 
         for i in range(steps, 0, -1):
@@ -241,11 +255,16 @@ class KaleidoscopeRenderer:
         cfg = self.config
         reactivity = cfg.bg_reactivity
         energy_boost = 1 + self.smoothed_harmonic * 2 * reactivity
+        
+        # Spectral flatness adds jitter to particle movement
+        jitter_amt = self.smoothed_flatness * 5 * reactivity
+        import random
 
         for particle in self.particles:
             # Update position
-            particle['x'] += math.cos(particle['angle']) * particle['speed'] * energy_boost
-            particle['y'] += math.sin(particle['angle']) * particle['speed'] * energy_boost
+            particle['jitter'] = self._lerp(particle['jitter'], (random.random() - 0.5) * jitter_amt, 0.2)
+            particle['x'] += math.cos(particle['angle']) * particle['speed'] * energy_boost + particle['jitter']
+            particle['y'] += math.sin(particle['angle']) * particle['speed'] * energy_boost + particle['jitter']
 
             # Wrap around edges
             if particle['x'] < 0:
@@ -263,7 +282,8 @@ class KaleidoscopeRenderer:
             beat_brightness = 1 + self.pulse_intensity * 0.5
 
             # Calculate alpha and size
-            alpha = particle['brightness'] * pulse_brightness * beat_brightness * reactivity
+            # Sharpness increases particle alpha
+            alpha = particle['brightness'] * pulse_brightness * beat_brightness * reactivity * (1 + self.smoothed_sharpness * 0.5)
             size = particle['size'] * (1 + self.smoothed_percussive * 0.5)
 
             # Draw particle
@@ -299,16 +319,17 @@ class KaleidoscopeRenderer:
         for i in range(3):
             phase = (1 - self.pulse_intensity + i * 0.2) % 1
             radius = int(phase * max_radius)
-            alpha = self.pulse_intensity * 0.15 * (1 - phase)
+            # Sharpness makes rings thinner but brighter
+            alpha = self.pulse_intensity * 0.15 * (1 - phase) * (1 + self.smoothed_sharpness)
 
             if alpha > 0.01 and radius > 0:
-                color_val = int(255 * min(1, alpha))
                 ring_color = (
-                    int(accent[0] * alpha),
-                    int(accent[1] * alpha),
-                    int(accent[2] * alpha)
+                    int(min(255, accent[0] * alpha * 2)),
+                    int(min(255, accent[1] * alpha * 2)),
+                    int(min(255, accent[2] * alpha * 2))
                 )
-                pygame.draw.circle(surface, ring_color, center, radius, 2)
+                line_width = max(1, int(2 - self.smoothed_sharpness))
+                pygame.draw.circle(surface, ring_color, center, radius, line_width)
 
     def _draw_kaleidoscope(
         self,
@@ -319,42 +340,47 @@ class KaleidoscopeRenderer:
         """Draw the full kaleidoscope pattern for a single frame."""
         cfg = self.config
 
-        # Extract values from frame
-        percussive = frame_data.get("percussive_impact", 0.0)
-        harmonic = frame_data.get("harmonic_energy", 0.0)
-        brightness = frame_data.get("spectral_brightness", 0.5)
+        # Extract values from frame (using smoothed versions from render_frame)
+        percussive = self.smoothed_percussive
+        harmonic = self.smoothed_harmonic
+        brightness = self.smoothed_brightness
+        sharpness = self.smoothed_sharpness
+        
         dominant_chroma = frame_data.get("dominant_chroma", "C")
         is_beat = frame_data.get("is_beat", False)
 
         # Map audio to visual properties
-        # Scale: base + percussive boost
-        scale = 1.0 + (percussive * (cfg.max_scale - 1.0))
+        # Scale: base + percussive boost + sharp spikes
+        scale = 1.0 + (percussive * (cfg.max_scale - 1.0)) + (sharpness * 0.2)
         if is_beat:
             scale *= 1.1  # Extra pop on beats
 
         radius = cfg.base_radius * scale
 
-        # Thickness: driven by percussive impact
+        # Thickness: driven by percussive impact, but sharpness thins the lines
         thickness = int(cfg.base_thickness + percussive * (cfg.max_thickness - cfg.base_thickness))
+        thickness = max(1, int(thickness * (1 - sharpness * 0.5)))
 
-        # Rotation: accumulate based on harmonic energy
-        rotation_delta = harmonic * cfg.rotation_speed * (math.pi / 30)  # Smoother rotation
+        # Rotation: accumulate based on harmonic energy, brilliance adds speed spikes
+        rotation_delta = (harmonic + self.smoothed_brilliance) * cfg.rotation_speed * (math.pi / 30)
         self.accumulated_rotation += rotation_delta
 
-        # Polygon sides: brightness controls complexity
-        num_sides = int(cfg.min_sides + brightness * (cfg.max_sides - cfg.min_sides))
-        num_sides = max(cfg.min_sides, min(cfg.max_sides, num_sides))
+        # Polygon sides: brightness controls complexity, flux adds temporary complexity spikes
+        side_boost = int(self.smoothed_flux * 3)
+        num_sides = int(cfg.min_sides + brightness * (cfg.max_sides - cfg.min_sides)) + side_boost
+        num_sides = max(cfg.min_sides, min(cfg.max_sides + 5, num_sides))
 
-        # Orbit distance: modulated by harmonic
-        orbit = cfg.orbit_radius * (0.5 + harmonic * 0.5)
+        # Orbit distance: modulated by harmonic and sub-bass
+        orbit = cfg.orbit_radius * (0.5 + harmonic * 0.5 + self.smoothed_sub_bass * 0.3)
 
         # Color from chroma
         hue = self._note_to_hue(dominant_chroma)
-        base_color = self._hue_to_rgb(hue, 0.85, 0.95)
+        # Brilliance increases color saturation
+        base_color = self._hue_to_rgb(hue, 0.7 + self.smoothed_brilliance * 0.3, 0.95)
 
         # Secondary color (complementary)
         secondary_hue = (hue + 0.5) % 1.0
-        secondary_color = self._hue_to_rgb(secondary_hue, 0.7, 0.8)
+        secondary_color = self._hue_to_rgb(secondary_hue, 0.6, 0.8)
 
         # Draw radial mirrors
         for i in range(cfg.num_mirrors):
@@ -376,11 +402,13 @@ class KaleidoscopeRenderer:
             )
 
             # Draw inner polygon (counter-rotating)
+            # Sharpness makes the inner shape more distinct
+            inner_sides = max(3, num_sides - 2)
             self._draw_polygon(
                 surface,
                 (orbit_x, orbit_y),
-                radius * 0.4,
-                max(3, num_sides - 2),
+                radius * (0.35 + sharpness * 0.1),
+                inner_sides,
                 -self.accumulated_rotation * 1.5 + mirror_angle,
                 secondary_color,
                 max(1, thickness // 2),
@@ -414,22 +442,49 @@ class KaleidoscopeRenderer:
         """
         cfg = self.config
 
-        # Smooth incoming values for fluid animation
+        # Extract values from frame (v1.1 schema)
         percussive = frame_data.get("percussive_impact", 0.1)
         harmonic = frame_data.get("harmonic_energy", 0.3)
         brightness = frame_data.get("spectral_brightness", 0.5)
+        
+        # New features from v1.1
+        flatness = frame_data.get("spectral_flatness", 0.0)
+        flux = frame_data.get("spectral_flux", 0.0)
+        sharpness = frame_data.get("sharpness", 0.0)
+        sub_bass = frame_data.get("sub_bass", 0.0)
+        brilliance = frame_data.get("brilliance", 0.0)
+        
         is_beat = frame_data.get("is_beat", False)
 
-        smooth_factor = 0.15
+        # Smoothing factors
+        smooth_fast = 0.2
+        smooth_med = 0.1
+        smooth_slow = 0.05
+
         self.smoothed_percussive = self._lerp(
             self.smoothed_percussive, percussive,
-            0.5 if is_beat else smooth_factor
+            0.5 if is_beat else smooth_fast
         )
         self.smoothed_harmonic = self._lerp(
-            self.smoothed_harmonic, harmonic, smooth_factor * 0.5
+            self.smoothed_harmonic, harmonic, smooth_med
         )
         self.smoothed_brightness = self._lerp(
-            self.smoothed_brightness, brightness, smooth_factor * 0.3
+            self.smoothed_brightness, brightness, smooth_slow
+        )
+        self.smoothed_flatness = self._lerp(
+            self.smoothed_flatness, flatness, smooth_med
+        )
+        self.smoothed_flux = self._lerp(
+            self.smoothed_flux, flux, smooth_fast
+        )
+        self.smoothed_sharpness = self._lerp(
+            self.smoothed_sharpness, sharpness, smooth_med
+        )
+        self.smoothed_sub_bass = self._lerp(
+            self.smoothed_sub_bass, sub_bass, smooth_med
+        )
+        self.smoothed_brilliance = self._lerp(
+            self.smoothed_brilliance, brilliance, smooth_fast
         )
 
         # Create or reuse surface

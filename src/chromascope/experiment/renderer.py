@@ -1,9 +1,10 @@
 """
 Frame orchestrator for the fractal kaleidoscope renderer.
 
-Reads manifest frame data, drives fractal generation, kaleidoscope
-mirroring, color grading, and post-processing. Yields frames as
-a generator for memory-efficient piping to the encoder.
+Enhanced with v1.1 audio features:
+- Sub-bass & Brilliance drive deep zoom and rotation spikes.
+- Spectral Flux & Sharpness control fractal detail and post-process intensity.
+- Spectral Flatness modulates noise injection for organic texture.
 """
 
 import math
@@ -95,13 +96,20 @@ class FractalKaleidoscopeRenderer:
         self.julia_t = 0.0  # parameter along the c-value path
         self.time = 0.0
 
-        # Smoothed audio values
+        # Smoothed audio values (v1.1)
         self._smooth_percussive = 0.0
         self._smooth_harmonic = 0.3
         self._smooth_brightness = 0.5
         self._smooth_energy = 0.3
         self._smooth_low = 0.3
         self._smooth_high = 0.3
+        
+        # New features smoothing
+        self._smooth_flux = 0.0
+        self._smooth_flatness = 0.0
+        self._smooth_sharpness = 0.0
+        self._smooth_sub_bass = 0.0
+        self._smooth_brilliance = 0.0
 
         # Lissajous drift state
         self._drift_phase = 0.0
@@ -140,10 +148,8 @@ class FractalKaleidoscopeRenderer:
     def _smooth_audio(self, frame_data: dict[str, Any]):
         """Update smoothed audio values from frame data."""
         is_beat = frame_data.get("is_beat", False)
-        # Fast attack on beats, but not so fast that it feels jerky.
-        # 0.3 reaches ~87% of target in 6 frames (100ms) — punchy
-        # but fluid.  Non-beat frames use 0.12 for gentle drift.
         fast = 0.3 if is_beat else 0.12
+        med = 0.1
         slow = 0.08
 
         self._smooth_percussive = self._lerp(
@@ -176,6 +182,33 @@ class FractalKaleidoscopeRenderer:
             frame_data.get("high_energy", 0.3),
             slow,
         )
+        
+        # v1.1 smoothing
+        self._smooth_flux = self._lerp(
+            self._smooth_flux,
+            frame_data.get("spectral_flux", 0.0),
+            fast
+        )
+        self._smooth_flatness = self._lerp(
+            self._smooth_flatness,
+            frame_data.get("spectral_flatness", 0.0),
+            med
+        )
+        self._smooth_sharpness = self._lerp(
+            self._smooth_sharpness,
+            frame_data.get("sharpness", 0.0),
+            med
+        )
+        self._smooth_sub_bass = self._lerp(
+            self._smooth_sub_bass,
+            frame_data.get("sub_bass", 0.0),
+            med
+        )
+        self._smooth_brilliance = self._lerp(
+            self._smooth_brilliance,
+            frame_data.get("brilliance", 0.0),
+            fast
+        )
 
     def render_frame(
         self,
@@ -203,11 +236,11 @@ class FractalKaleidoscopeRenderer:
 
         # --- Update state ---
 
-        # Rotation
+        # Rotation: harmonic + brilliance spikes
         rotation_delta = (
             0.01
             * cfg.base_rotation_speed
-            * (1.0 + self._smooth_harmonic * 2.0)
+            * (1.0 + self._smooth_harmonic * 2.0 + self._smooth_brilliance * 3.0)
         )
         self.accumulated_rotation += rotation_delta
 
@@ -216,10 +249,10 @@ class FractalKaleidoscopeRenderer:
         self.julia_t += c_speed
         julia_c = interpolate_c(self.julia_t)
 
-        # Max iterations from brightness
+        # Max iterations from brightness + flux
         max_iter = int(
             cfg.base_max_iter
-            + self._smooth_brightness * (cfg.max_max_iter - cfg.base_max_iter)
+            + (self._smooth_brightness + self._smooth_flux * 0.5) * (cfg.max_max_iter - cfg.base_max_iter)
         )
 
         # Hue from chroma
@@ -229,28 +262,16 @@ class FractalKaleidoscopeRenderer:
 
         # --- Generate fractal texture ---
 
-        # Fractal zoom breathes with the music rather than monotonically
-        # increasing.  Bass energy pushes the zoom inward (revealing
-        # finer boundary structure), while a slow sine oscillation keeps
-        # it moving so the Julia set boundary stays visible.  The
-        # feedback buffer provides the infinite-tunnel effect separately.
+        # Fractal zoom breathes with the music. Sub-bass pushes zoom deeper.
         breath = 0.4 * math.sin(self.time * 0.4)
-        fractal_zoom = 1.0 + self._smooth_low * 0.5 + breath
-        fractal_zoom = max(0.6, min(fractal_zoom, 1.8))
+        fractal_zoom = 1.0 + self._smooth_low * 0.5 + self._smooth_sub_bass * 0.8 + breath
+        fractal_zoom = max(0.6, min(fractal_zoom, 2.5))
 
-        # Lissajous drift — generous amplitude keeps the viewport
-        # exploring the Julia set boundary rather than sitting in a
-        # dark interior pocket.
+        # Lissajous drift
         self._drift_phase += dt * 0.3
         drift_x = math.sin(self._drift_phase * 1.3) * 0.25 / max(fractal_zoom, 1)
         drift_y = math.cos(self._drift_phase * 0.9) * 0.18 / max(fractal_zoom, 1)
 
-        # Cheap low-res probe to detect flat Julia sets BEFORE
-        # spending time on the full-res render.  When the current
-        # c-value produces a featureless set, fall back to a
-        # known-good c.  Two-tier fallback: first try the last
-        # cached good c (re-probed at the CURRENT zoom), then
-        # the always-reliable default.
         use_mandelbrot = cfg.fractal_mode == "mandelbrot"
         effective_c = julia_c
 
@@ -278,23 +299,22 @@ class FractalKaleidoscopeRenderer:
                 max_iter=max_iter,
             )
 
-        # Light organic noise — very subtle, just to add living texture.
-        # Heavy noise injection destroys fractal boundary detail after
-        # the kaleidoscope mirror spreads it, so we keep this minimal.
-        if self._smooth_energy > 0.3:
+        # Organic noise: spectral flatness controls noise injection amount
+        if self._smooth_energy > 0.3 or self._smooth_flatness > 0.2:
             noise = noise_fractal(
                 cfg.width,
                 cfg.height,
                 time=self.time,
                 octaves=4,
-                scale=2.0 + self._smooth_harmonic * 2,
+                scale=2.0 + self._smooth_harmonic * 2 + self._smooth_flatness * 4,
             )
-            noise_blend = 0.03 + self._smooth_energy * 0.04
+            # Flatness increases noise blend
+            noise_blend = 0.03 + self._smooth_energy * 0.04 + self._smooth_flatness * 0.1
             texture = texture * (1 - noise_blend) + noise * noise_blend
 
         # --- Radial warp (breathing) ---
 
-        warp_amp = cfg.warp_amplitude * (0.5 + self._smooth_low * 1.5)
+        warp_amp = cfg.warp_amplitude * (0.5 + self._smooth_low * 1.5 + self._smooth_flux * 1.0)
         if warp_amp > 0.005:
             texture = radial_warp(
                 texture,
@@ -306,9 +326,7 @@ class FractalKaleidoscopeRenderer:
         # --- Kaleidoscope mirror ---
 
         # Segment count: base ± smoothed high energy modulation.
-        # Using the smoothed value prevents frame-to-frame jitter
-        # that makes the kaleidoscope pattern jump.
-        seg_mod = int(self._smooth_high * 4)
+        seg_mod = int(self._smooth_high * 4 + self._smooth_flux * 2)
         num_seg = max(4, cfg.num_segments + seg_mod - 2)
 
         texture = polar_mirror(
@@ -323,13 +341,15 @@ class FractalKaleidoscopeRenderer:
             texture,
             hue_base=hue_base,
             time=self.time,
-            saturation=cfg.base_saturation * (0.8 + self._smooth_harmonic * 0.4),
+            # Brilliance increases saturation
+            saturation=cfg.base_saturation * (0.8 + self._smooth_harmonic * 0.4 + self._smooth_brilliance * 0.5),
             contrast=cfg.contrast,
         )
 
         # --- Infinite zoom blend ---
 
-        zoom_factor = cfg.base_zoom_factor * (1.0 + self._smooth_energy * 0.01)
+        # Energy + Sub-bass pushes the infinite zoom faster
+        zoom_factor = cfg.base_zoom_factor * (1.0 + self._smooth_energy * 0.01 + self._smooth_sub_bass * 0.02)
         # Reduce feedback on heavy percussion so fresh fractal detail dominates
         feedback_alpha = cfg.feedback_alpha * (1.0 - self._smooth_percussive * 0.6)
 
@@ -343,25 +363,26 @@ class FractalKaleidoscopeRenderer:
         # --- Post-processing ---
 
         if cfg.glow_enabled:
-            glow_int = cfg.glow_intensity * (1.0 + self._smooth_percussive * 0.3)
-            glow_int = min(glow_int, 0.50)
+            # Flux and percussive drive glow
+            glow_int = cfg.glow_intensity * (1.0 + self._smooth_percussive * 0.3 + self._smooth_flux * 0.4)
+            glow_int = min(glow_int, 0.65)
             frame_rgb = add_glow(frame_rgb, intensity=glow_int, radius=cfg.glow_radius)
 
         if cfg.aberration_enabled:
+            # Sharpness drives chromatic aberration
             ab_offset = int(
-                cfg.aberration_offset * (1.0 + self._smooth_percussive * 1.5)
+                cfg.aberration_offset * (1.0 + self._smooth_percussive * 1.5 + self._smooth_sharpness * 3.0)
             )
             frame_rgb = chromatic_aberration(frame_rgb, offset=ab_offset)
 
         if cfg.vignette_strength > 0:
-            # Vignette pulses with percussion — beats contract the
-            # spotlight, drawing the eye inward to the fractal detail.
+            # Vignette pulses with percussion and flux
             vign_str = cfg.vignette_strength * (
-                1.0 + self._smooth_percussive * 0.6
+                1.0 + self._smooth_percussive * 0.6 + self._smooth_flux * 0.4
             )
             frame_rgb = vignette(frame_rgb, strength=vign_str)
 
-        # Tone-map before storing in feedback buffer to break brightness accumulation
+        # Tone-map before storing in feedback buffer
         frame_rgb = tone_map_soft(frame_rgb)
 
         # Update feedback buffer
@@ -376,13 +397,6 @@ class FractalKaleidoscopeRenderer:
     ) -> Iterator[np.ndarray]:
         """
         Render all frames from a manifest as a generator.
-
-        Args:
-            manifest: Complete manifest dict with "frames" list.
-            progress_callback: Optional callback(current, total).
-
-        Yields:
-            (H, W, 3) uint8 RGB arrays, one per frame.
         """
         frames = manifest.get("frames", [])
         total = len(frames)
@@ -399,6 +413,11 @@ class FractalKaleidoscopeRenderer:
         self._smooth_energy = 0.3
         self._smooth_low = 0.3
         self._smooth_high = 0.3
+        self._smooth_flux = 0.0
+        self._smooth_flatness = 0.0
+        self._smooth_sharpness = 0.0
+        self._smooth_sub_bass = 0.0
+        self._smooth_brilliance = 0.0
 
         for i, frame_data in enumerate(frames):
             frame = self.render_frame(frame_data, i)

@@ -217,13 +217,13 @@ Extract beat and onset features.
 
 #### `extract_energy(decomposed, hop_length)`
 
-Extract RMS and frequency band energy.
+Extract RMS, spectral flux, and frequency band energy.
 
 **Returns:** `EnergyFeatures`
 
 #### `extract_tonality(decomposed, hop_length)`
 
-Extract chroma and spectral centroid.
+Extract chroma, spectral centroid, flatness, and rolloff.
 
 **Returns:** `TonalityFeatures`
 
@@ -254,6 +254,7 @@ SignalPolisher(
     fps: int = 60,
     impact_envelope: EnvelopeParams | None = None,
     energy_envelope: EnvelopeParams | None = None,
+    adaptive_envelopes: bool = False,
 )
 ```
 
@@ -452,6 +453,7 @@ class EnergyFeatures:
     rms: np.ndarray               # Global RMS energy
     rms_harmonic: np.ndarray      # Harmonic RMS
     rms_percussive: np.ndarray    # Percussive RMS
+    spectral_flux: np.ndarray     # Onset strength/change
     frequency_bands: FrequencyBands
 ```
 
@@ -460,9 +462,18 @@ class EnergyFeatures:
 ```python
 @dataclass
 class FrequencyBands:
-    low: np.ndarray    # 0-200Hz
-    mid: np.ndarray    # 200Hz-4kHz
-    high: np.ndarray   # 4kHz+
+    sub_bass: np.ndarray    # 20-60Hz
+    bass: np.ndarray        # 60-250Hz
+    low_mid: np.ndarray     # 250-500Hz
+    mid: np.ndarray         # 500-2000Hz
+    high_mid: np.ndarray    # 2000-4000Hz
+    presence: np.ndarray    # 4000-6000Hz
+    brilliance: np.ndarray  # 6000-20000Hz
+    
+    # Aggregates
+    low: np.ndarray         # 0-200Hz
+    mid_aggregate: np.ndarray # 200Hz-4kHz
+    high: np.ndarray        # 4kHz+
 ```
 
 ### TonalityFeatures
@@ -472,6 +483,9 @@ class FrequencyBands:
 class TonalityFeatures:
     chroma: np.ndarray                  # Shape: (12, n_frames)
     spectral_centroid: np.ndarray       # Brightness
+    spectral_flatness: np.ndarray       # Noisiness
+    spectral_rolloff: np.ndarray        # Bandwidth
+    zero_crossing_rate: np.ndarray      # Noisiness
     dominant_chroma_indices: np.ndarray # Dominant note per frame
 ```
 
@@ -499,10 +513,27 @@ class PolishedFeatures:
     percussive_impact: np.ndarray # Smoothed [0, 1]
     harmonic_energy: np.ndarray   # Smoothed [0, 1]
     global_energy: np.ndarray     # Smoothed [0, 1]
-    low_energy: np.ndarray        # Smoothed [0, 1]
-    mid_energy: np.ndarray        # Smoothed [0, 1]
-    high_energy: np.ndarray       # Smoothed [0, 1]
+    spectral_flux: np.ndarray     # Smoothed [0, 1]
+    
+    # 7-band system
+    sub_bass: np.ndarray
+    bass: np.ndarray
+    low_mid: np.ndarray
+    mid: np.ndarray
+    high_mid: np.ndarray
+    presence: np.ndarray
+    brilliance: np.ndarray
+    
+    # Legacy bands
+    low_energy: np.ndarray        
+    mid_energy: np.ndarray        
+    high_energy: np.ndarray       
+    
     spectral_brightness: np.ndarray
+    spectral_flatness: np.ndarray
+    spectral_rolloff: np.ndarray
+    zero_crossing_rate: np.ndarray
+    
     chroma: np.ndarray            # Shape: (12, n_frames)
     dominant_chroma_indices: np.ndarray
     n_frames: int
@@ -532,10 +563,14 @@ FeatureAnalyzer.CHROMA_NAMES = [
 ]
 ```
 
-### Default Frequency Bands
+### Frequency Bands (Extended)
 
 | Band | Frequency Range |
 |------|-----------------|
-| Low | 0 - 200 Hz |
-| Mid | 200 Hz - 4 kHz |
-| High | 4 kHz+ |
+| Sub-Bass | 20 - 60 Hz |
+| Bass | 60 - 250 Hz |
+| Low-Mid | 250 - 500 Hz |
+| Mid | 500 - 2000 Hz |
+| High-Mid | 2000 - 4000 Hz |
+| Presence | 4000 - 6000 Hz |
+| Brilliance | 6000+ Hz |

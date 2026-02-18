@@ -25,9 +25,9 @@ class ManifestMetadata:
     fps: int
     n_frames: int
     # Engine or exporter version (kept for backward compatibility)
-    version: str = "1.0"
+    version: str = "1.1"
     # Explicit schema version for the manifest payload
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
 
 
 class ManifestExporter:
@@ -78,10 +78,28 @@ class ManifestExporter:
             "percussive_impact": self._round(polished.percussive_impact[index]),
             "harmonic_energy": self._round(polished.harmonic_energy[index]),
             "global_energy": self._round(polished.global_energy[index]),
+            "spectral_flux": self._round(polished.spectral_flux[index]),
+            
+            # 7-band frequency energy
+            "sub_bass": self._round(polished.sub_bass[index]),
+            "bass": self._round(polished.bass[index]),
+            "low_mid": self._round(polished.low_mid[index]),
+            "mid": self._round(polished.mid[index]),
+            "high_mid": self._round(polished.high_mid[index]),
+            "presence": self._round(polished.presence[index]),
+            "brilliance": self._round(polished.brilliance[index]),
+            
+            # Legacy bands (kept for backward compatibility)
             "low_energy": self._round(polished.low_energy[index]),
             "mid_energy": self._round(polished.mid_energy[index]),
             "high_energy": self._round(polished.high_energy[index]),
+            
+            # Tonality/Texture
             "spectral_brightness": self._round(polished.spectral_brightness[index]),
+            "spectral_flatness": self._round(polished.spectral_flatness[index]),
+            "spectral_rolloff": self._round(polished.spectral_rolloff[index]),
+            "zero_crossing_rate": self._round(polished.zero_crossing_rate[index]),
+            
             "dominant_chroma": dominant_chroma,
             "chroma_values": {
                 FeatureAnalyzer.CHROMA_NAMES[i]: self._round(polished.chroma[i, index])
@@ -90,7 +108,6 @@ class ManifestExporter:
         }
 
         # Derived visual primitives that provide a stable, renderer-agnostic contract.
-        # These are intentionally simple aliases/aggregations over the richer fields.
         primitives = self._compute_primitives(frame)
         frame.update(primitives)
 
@@ -117,10 +134,17 @@ class ManifestExporter:
         # Use 0-1 scale over the 12 chroma bins
         pitch_hue = chroma_index / (len(FeatureAnalyzer.CHROMA_NAMES) - 1)
 
-        # Texture: simple aggregation of mid/high band activity
-        mid = frame["mid_energy"]
-        high = frame["high_energy"]
-        texture = max(0.0, min(1.0, (mid + high) / 2.0))
+        # Texture: richer aggregation of noisiness and high-frequency content
+        flatness = frame["spectral_flatness"]
+        zcr = frame["zero_crossing_rate"]
+        presence = frame["presence"]
+        brilliance = frame["brilliance"]
+        texture = max(0.0, min(1.0, (flatness + zcr + presence + brilliance) / 4.0))
+
+        # Sharpness: focus on spectral rolloff and flux
+        flux = frame["spectral_flux"]
+        rolloff = frame["spectral_rolloff"]
+        sharpness = max(0.0, min(1.0, (flux + rolloff) / 2.0))
 
         return {
             "impact": impact,
@@ -128,6 +152,7 @@ class ManifestExporter:
             "brightness": brightness,
             "pitch_hue": pitch_hue,
             "texture": texture,
+            "sharpness": sharpness,
         }
 
     def build_manifest(
@@ -224,10 +249,21 @@ class ManifestExporter:
             percussive_impact=polished.percussive_impact,
             harmonic_energy=polished.harmonic_energy,
             global_energy=polished.global_energy,
+            spectral_flux=polished.spectral_flux,
+            sub_bass=polished.sub_bass,
+            bass=polished.bass,
+            low_mid=polished.low_mid,
+            mid=polished.mid,
+            high_mid=polished.high_mid,
+            presence=polished.presence,
+            brilliance=polished.brilliance,
             low_energy=polished.low_energy,
             mid_energy=polished.mid_energy,
             high_energy=polished.high_energy,
             spectral_brightness=polished.spectral_brightness,
+            spectral_flatness=polished.spectral_flatness,
+            spectral_rolloff=polished.spectral_rolloff,
+            zero_crossing_rate=polished.zero_crossing_rate,
             chroma=polished.chroma,
             dominant_chroma_indices=polished.dominant_chroma_indices,
             frame_times=polished.frame_times,

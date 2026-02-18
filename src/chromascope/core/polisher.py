@@ -33,14 +33,27 @@ class PolishedFeatures:
     percussive_impact: np.ndarray
     harmonic_energy: np.ndarray
     global_energy: np.ndarray
+    spectral_flux: np.ndarray
 
     # Frequency bands [0.0, 1.0]
+    sub_bass: np.ndarray
+    bass: np.ndarray
+    low_mid: np.ndarray
+    mid: np.ndarray
+    high_mid: np.ndarray
+    presence: np.ndarray
+    brilliance: np.ndarray
+    
+    # Legacy bands (optional, but keeping for compatibility)
     low_energy: np.ndarray
     mid_energy: np.ndarray
     high_energy: np.ndarray
 
-    # Tonality [0.0, 1.0]
+    # Tonality/Texture [0.0, 1.0]
     spectral_brightness: np.ndarray
+    spectral_flatness: np.ndarray
+    spectral_rolloff: np.ndarray
+    zero_crossing_rate: np.ndarray
     chroma: np.ndarray  # Shape: (12, n_frames), normalized
 
     # Dominant note per frame
@@ -204,11 +217,11 @@ class SignalPolisher:
         """
         Normalize spectral centroid to [0.0, 1.0] as "brightness".
 
-        Maps typical speech/music range (100Hz - 8000Hz) to 0-1.
+        Maps typical music range (100Hz - 10000Hz) to 0-1.
         """
         # Typical range for music
         min_hz = 100.0
-        max_hz = 8000.0
+        max_hz = 10000.0
 
         brightness = (centroid - min_hz) / (max_hz - min_hz)
         brightness = np.clip(brightness, 0.0, 1.0)
@@ -266,24 +279,45 @@ class SignalPolisher:
             energy_env,
         )
 
-        # Frequency bands
-        low_energy = self.apply_envelope(
-            self.normalize(features.energy.frequency_bands.low),
-            energy_env,
-        )
-        mid_energy = self.apply_envelope(
-            self.normalize(features.energy.frequency_bands.mid),
-            energy_env,
-        )
-        high_energy = self.apply_envelope(
-            self.normalize(features.energy.frequency_bands.high),
-            energy_env,
+        spectral_flux = self.apply_envelope(
+            self.normalize(features.energy.spectral_flux),
+            impact_env,
         )
 
-        # Spectral brightness
+        # 7-band frequency energy
+        fb = features.energy.frequency_bands
+        sub_bass = self.apply_envelope(self.normalize(fb.sub_bass), energy_env)
+        bass = self.apply_envelope(self.normalize(fb.bass), energy_env)
+        low_mid = self.apply_envelope(self.normalize(fb.low_mid), energy_env)
+        mid = self.apply_envelope(self.normalize(fb.mid), energy_env)
+        high_mid = self.apply_envelope(self.normalize(fb.high_mid), energy_env)
+        presence = self.apply_envelope(self.normalize(fb.presence), energy_env)
+        brilliance = self.apply_envelope(self.normalize(fb.brilliance), energy_env)
+
+        # Legacy bands
+        low_energy = self.apply_envelope(self.normalize(fb.low), energy_env)
+        mid_energy = self.apply_envelope(self.normalize(fb.mid_aggregate), energy_env)
+        high_energy = self.apply_envelope(self.normalize(fb.high), energy_env)
+
+        # Tonality/Texture
         spectral_brightness = self.smooth_spectral_centroid(
             features.tonality.spectral_centroid,
             features.sample_rate,
+        )
+        
+        spectral_flatness = self.apply_envelope(
+            self.normalize(features.tonality.spectral_flatness),
+            energy_env,
+        )
+        
+        spectral_rolloff = self.apply_envelope(
+            self.normalize(features.tonality.spectral_rolloff),
+            energy_env,
+        )
+        
+        zero_crossing_rate = self.apply_envelope(
+            self.normalize(features.tonality.zero_crossing_rate),
+            energy_env,
         )
 
         # Normalize chroma (each bin independently)
@@ -297,10 +331,21 @@ class SignalPolisher:
             percussive_impact=percussive_impact,
             harmonic_energy=harmonic_energy,
             global_energy=global_energy,
+            spectral_flux=spectral_flux,
+            sub_bass=sub_bass,
+            bass=bass,
+            low_mid=low_mid,
+            mid=mid,
+            high_mid=high_mid,
+            presence=presence,
+            brilliance=brilliance,
             low_energy=low_energy,
             mid_energy=mid_energy,
             high_energy=high_energy,
             spectral_brightness=spectral_brightness,
+            spectral_flatness=spectral_flatness,
+            spectral_rolloff=spectral_rolloff,
+            zero_crossing_rate=zero_crossing_rate,
             chroma=chroma_normalized,
             dominant_chroma_indices=features.tonality.dominant_chroma_indices,
             n_frames=n_frames,

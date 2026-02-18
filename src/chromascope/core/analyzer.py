@@ -2,7 +2,7 @@
 Feature extraction module for audio analysis.
 
 Extracts visual drivers: beats, onsets, RMS energy,
-frequency bands, chroma features, and spectral centroid.
+frequency bands, chroma features, spectral characteristics, and tonality.
 """
 
 from dataclasses import dataclass, field
@@ -18,9 +18,18 @@ from chromascope.core.decomposer import DecomposedAudio
 class FrequencyBands:
     """Energy levels for frequency sub-bands."""
 
-    low: np.ndarray  # 0-200Hz
-    mid: np.ndarray  # 200Hz-4kHz
-    high: np.ndarray  # 4kHz+
+    sub_bass: np.ndarray    # 20-60Hz
+    bass: np.ndarray        # 60-250Hz
+    low_mid: np.ndarray     # 250-500Hz
+    mid: np.ndarray         # 500-2000Hz
+    high_mid: np.ndarray    # 2000-4000Hz
+    presence: np.ndarray    # 4000-6000Hz
+    brilliance: np.ndarray  # 6000-20000Hz
+
+    # Legacy bands (for compatibility if needed, or aggregate)
+    low: np.ndarray         # 0-200Hz
+    mid_aggregate: np.ndarray  # 200Hz-4kHz
+    high: np.ndarray        # 4kHz+
 
 
 @dataclass
@@ -44,6 +53,7 @@ class EnergyFeatures:
     rms: np.ndarray
     rms_harmonic: np.ndarray
     rms_percussive: np.ndarray
+    spectral_flux: np.ndarray
     frequency_bands: FrequencyBands
 
 
@@ -53,6 +63,9 @@ class TonalityFeatures:
 
     chroma: np.ndarray  # Shape: (12, n_frames)
     spectral_centroid: np.ndarray
+    spectral_flatness: np.ndarray
+    spectral_rolloff: np.ndarray
+    zero_crossing_rate: np.ndarray
     dominant_chroma_indices: np.ndarray
     # Compact timbre representation (MFCCs)
     mfcc: np.ndarray | None = None
@@ -203,6 +216,13 @@ class FeatureAnalyzer:
             hop_length=hop_length,
         )[0]
 
+        # Spectral flux (onset strength envelope)
+        spectral_flux = librosa.onset.onset_strength(
+            y=decomposed.original,
+            sr=sr,
+            hop_length=hop_length,
+        )
+
         # Frequency band separation using bandpass filtering
         frequency_bands = self._extract_frequency_bands(
             decomposed.original,
@@ -214,6 +234,7 @@ class FeatureAnalyzer:
             rms=rms,
             rms_harmonic=rms_harmonic,
             rms_percussive=rms_percussive,
+            spectral_flux=spectral_flux,
             frequency_bands=frequency_bands,
         )
 
@@ -224,22 +245,36 @@ class FeatureAnalyzer:
         hop_length: int,
     ) -> FrequencyBands:
         """
-        Extract energy in Low (0-200Hz), Mid (200Hz-4kHz), High (4kHz+) bands.
+        Extract energy in multiple frequency sub-bands.
         """
         nyquist = sr / 2
 
-        # Design bandpass filters
-        # Low: 20Hz - 200Hz
-        low_band = self._bandpass_rms(y, 20, 200, sr, hop_length)
+        # 7-band subdivision
+        sub_bass = self._bandpass_rms(y, 20, 60, sr, hop_length)
+        bass = self._bandpass_rms(y, 60, 250, sr, hop_length)
+        low_mid = self._bandpass_rms(y, 250, 500, sr, hop_length)
+        mid = self._bandpass_rms(y, 500, 2000, sr, hop_length)
+        high_mid = self._bandpass_rms(y, 2000, 4000, sr, hop_length)
+        presence = self._bandpass_rms(y, 4000, 6000, sr, hop_length)
+        brilliance = self._bandpass_rms(y, 6000, min(20000, nyquist - 100), sr, hop_length)
 
-        # Mid: 200Hz - 4000Hz
-        mid_band = self._bandpass_rms(y, 200, 4000, sr, hop_length)
+        # Legacy/Aggregate bands
+        low = self._bandpass_rms(y, 20, 200, sr, hop_length)
+        mid_agg = self._bandpass_rms(y, 200, 4000, sr, hop_length)
+        high = self._bandpass_rms(y, 4000, min(16000, nyquist - 100), sr, hop_length)
 
-        # High: 4000Hz - Nyquist
-        high_cutoff = min(16000, nyquist - 100)
-        high_band = self._bandpass_rms(y, 4000, high_cutoff, sr, hop_length)
-
-        return FrequencyBands(low=low_band, mid=mid_band, high=high_band)
+        return FrequencyBands(
+            sub_bass=sub_bass,
+            bass=bass,
+            low_mid=low_mid,
+            mid=mid,
+            high_mid=high_mid,
+            presence=presence,
+            brilliance=brilliance,
+            low=low,
+            mid_aggregate=mid_agg,
+            high=high,
+        )
 
     def _bandpass_rms(
         self,
@@ -255,6 +290,10 @@ class FeatureAnalyzer:
         # Normalize frequencies
         low_norm = low_freq / nyquist
         high_norm = min(high_freq / nyquist, 0.99)
+        
+        # Ensure low < high
+        if low_norm >= high_norm:
+            return np.zeros(int(len(y) / hop_length) + 1)
 
         # Design Butterworth bandpass filter
         sos = scipy_signal.butter(
@@ -278,10 +317,11 @@ class FeatureAnalyzer:
         hop_length: int,
     ) -> TonalityFeatures:
         """
-        Extract chroma features and spectral centroid.
+        Extract chroma features and spectral characteristics.
 
         Chroma is extracted from harmonic component for cleaner pitch content.
         """
+        y = decomposed.original
         sr = decomposed.sample_rate
 
         # Chroma from harmonic component (cleaner pitch representation)
@@ -294,8 +334,27 @@ class FeatureAnalyzer:
 
         # Spectral centroid from original (overall brightness)
         spectral_centroid = librosa.feature.spectral_centroid(
-            y=decomposed.original,
+            y=y,
             sr=sr,
+            hop_length=hop_length,
+        )[0]
+
+        # Spectral flatness (noisiness vs tonality)
+        spectral_flatness = librosa.feature.spectral_flatness(
+            y=y,
+            hop_length=hop_length,
+        )[0]
+
+        # Spectral rolloff
+        spectral_rolloff = librosa.feature.spectral_rolloff(
+            y=y,
+            sr=sr,
+            hop_length=hop_length,
+        )[0]
+
+        # Zero crossing rate
+        zcr = librosa.feature.zero_crossing_rate(
+            y=y,
             hop_length=hop_length,
         )[0]
 
@@ -304,7 +363,7 @@ class FeatureAnalyzer:
 
         # MFCC-based timbre representation from the original signal
         mfcc = librosa.feature.mfcc(
-            y=decomposed.original,
+            y=y,
             sr=sr,
             hop_length=hop_length,
             n_mfcc=13,
@@ -313,6 +372,9 @@ class FeatureAnalyzer:
         return TonalityFeatures(
             chroma=chroma,
             spectral_centroid=spectral_centroid,
+            spectral_flatness=spectral_flatness,
+            spectral_rolloff=spectral_rolloff,
+            zero_crossing_rate=zcr,
             dominant_chroma_indices=dominant_chroma_indices,
             mfcc=mfcc,
         )

@@ -113,10 +113,21 @@ class TestSignalPolisher:
             result.percussive_impact,
             result.harmonic_energy,
             result.global_energy,
+            result.spectral_flux,
+            result.sub_bass,
+            result.bass,
+            result.low_mid,
+            result.mid,
+            result.high_mid,
+            result.presence,
+            result.brilliance,
             result.low_energy,
             result.mid_energy,
             result.high_energy,
             result.spectral_brightness,
+            result.spectral_flatness,
+            result.spectral_rolloff,
+            result.zero_crossing_rate,
         ]
 
         for signal in continuous_signals:

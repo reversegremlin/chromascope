@@ -65,12 +65,29 @@ class TestManifestExporter:
             "percussive_impact",
             "harmonic_energy",
             "global_energy",
+            "spectral_flux",
+            "sub_bass",
+            "bass",
+            "low_mid",
+            "mid",
+            "high_mid",
+            "presence",
+            "brilliance",
             "low_energy",
             "mid_energy",
             "high_energy",
             "spectral_brightness",
+            "spectral_flatness",
+            "spectral_rolloff",
+            "zero_crossing_rate",
             "dominant_chroma",
             "chroma_values",
+            "impact",
+            "fluidity",
+            "brightness",
+            "pitch_hue",
+            "texture",
+            "sharpness",
         ]
 
         for field in required_fields:
@@ -141,6 +158,8 @@ class TestManifestExporter:
         assert "is_beat" in data
         assert "percussive_impact" in data
         assert "chroma" in data
+        assert "sub_bass" in data
+        assert "spectral_flux" in data
 
     def test_precision_parameter(self, polished_features):
         """Precision should limit decimal places."""

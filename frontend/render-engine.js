@@ -81,6 +81,11 @@
         const config = this.config;
         const reactivity = config.bgReactivity / 100;
 
+        // v1.1 features
+        const subBass = frameData.sub_bass || 0;
+        const brilliance = frameData.brilliance || 0;
+        const flux = frameData.spectral_flux || 0;
+
         // Parse colors
         const color1 = this.hexToRgb(config.bgColor);
         const color2 = this.hexToRgb(config.bgColor2);
@@ -88,13 +93,15 @@
         if (this._bgColorBlend === undefined) {
             this._bgColorBlend = 0.3;
         }
-        const targetBlend = 0.3 + this.smoothedValues.harmonicEnergy * reactivity * 0.3;
+        // Sub-bass influences the depth of the color blend
+        const targetBlend = (0.3 - subBass * 0.1) + this.smoothedValues.harmonicEnergy * reactivity * 0.3;
         this._bgColorBlend = this.lerp(this._bgColorBlend, targetBlend, 0.001);
         const blend = this._bgColorBlend;
 
         const centerX = width / 2;
         const centerY = height / 2;
-        const baseRadius = Math.max(width, height) * 0.95;
+        // Sub-bass expands the base background radius
+        const baseRadius = (Math.max(width, height) * 0.95) * (1 + subBass * 0.15);
 
         // Create radial gradient base
         const gradient = ctx.createRadialGradient(
@@ -108,7 +115,11 @@
             b: Math.round(color1.b + (color2.b - color1.b) * blend)
         };
 
-        gradient.addColorStop(0, `rgb(${midColor.r}, ${midColor.g}, ${midColor.b})`);
+        // Add brightness boost on beats, further influenced by spectral flux
+        const fluxBoost = flux * 25 * reactivity;
+        const beatBoost = this.bgState.pulseIntensity * 35 * reactivity + fluxBoost;
+
+        gradient.addColorStop(0, `rgb(${Math.min(255, Math.max(0, midColor.r + beatBoost))}, ${Math.min(255, Math.max(0, midColor.g + beatBoost))}, ${Math.min(255, Math.max(0, midColor.b + beatBoost))})`);
         gradient.addColorStop(0.6, `rgb(${Math.round(midColor.r * 0.7 + color1.r * 0.3)}, ${Math.round(midColor.g * 0.7 + color1.g * 0.3)}, ${Math.round(midColor.b * 0.7 + color1.b * 0.3)})`);
         gradient.addColorStop(1, `rgb(${color1.r}, ${color1.g}, ${color1.b})`);
 
@@ -121,7 +132,7 @@
         ctx.globalAlpha = 1;
 
         // --- Full-screen style-specific background pattern ---
-        this.renderStyledBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime);
+        this.renderStyledBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime, frameData);
 
         // Vignette
         const vignetteGradient = ctx.createRadialGradient(
@@ -138,12 +149,12 @@
 
         // Render particles if enabled
         if (config.bgParticles) {
-            this.renderParticles(deltaTime);
+            this.renderParticles(deltaTime, frameData);
         }
 
         // Render pulse rings on beats
         if (config.bgPulse && this.bgState.pulseIntensity > 0.1) {
-            this.renderPulseRings();
+            this.renderPulseRings(frameData);
         }
     }
 
@@ -151,12 +162,14 @@
      * Style-aware background dispatcher
      * Routes to unique background renderer per visualization style
      */
-    renderStyledBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime) {
+    renderStyledBackground(ctx, width, height, centerX, centerY, reactivity, deltaTime, frameData) {
         if (this._bgFractalRotation === undefined) {
             this._bgFractalRotation = 0;
         }
         const harmonic = this.smoothedValues.harmonicEnergy;
-        this._bgFractalRotation += deltaTime * 0.00004 * (1 + harmonic * reactivity * 0.5);
+        const brilliance = frameData.brilliance || 0;
+        // Brilliance adds temporary spikes to the background rotation speed
+        this._bgFractalRotation += deltaTime * 0.00004 * (1 + harmonic * reactivity * 0.5 + brilliance * reactivity);
 
         switch (this.config.style) {
             case 'glass':
@@ -1356,7 +1369,7 @@
         ctx.restore();
     }
 
-    renderParticles(deltaTime) {
+    renderParticles(deltaTime, frameData) {
         const ctx = this.ctx;
         const width = this.canvas.width;
         const height = this.canvas.height;
@@ -1365,13 +1378,21 @@
         const reactivity = config.bgReactivity / 100;
         // Use harmonic energy for smooth motion, not percussive
         const energyBoost = 1 + this.smoothedValues.harmonicEnergy * reactivity * 0.3;
+        
+        // v1.1 features
+        const flatness = frameData.spectral_flatness || 0;
+        const sharpness = frameData.sharpness || 0;
+        const jitterAmt = flatness * 5 * reactivity;
 
         ctx.save();
 
         this.bgState.particles.forEach(particle => {
-            // Update position gently - constant slow drift
-            particle.x += Math.cos(particle.angle) * particle.speed * deltaTime * 0.02 * energyBoost;
-            particle.y += Math.sin(particle.angle) * particle.speed * deltaTime * 0.02 * energyBoost;
+            // Update position gently - constant slow drift + flatness jitter
+            const jitterX = (Math.random() - 0.5) * jitterAmt;
+            const jitterY = (Math.random() - 0.5) * jitterAmt;
+            
+            particle.x += Math.cos(particle.angle) * particle.speed * deltaTime * 0.02 * energyBoost + jitterX;
+            particle.y += Math.sin(particle.angle) * particle.speed * deltaTime * 0.02 * energyBoost + jitterY;
 
             // Wrap around edges
             if (particle.x < 0) particle.x = width;
@@ -1383,8 +1404,8 @@
             particle.pulse += deltaTime * 0.001;
             const pulseBrightness = Math.sin(particle.pulse) * 0.15 + 0.85;
 
-            // Draw particle - subtle and consistent
-            const alpha = particle.brightness * pulseBrightness * reactivity * 0.5;
+            // Draw particle - subtle and consistent, boosted by sharpness
+            const alpha = particle.brightness * pulseBrightness * reactivity * 0.5 * (1 + sharpness * 0.5);
             const size = particle.size; // Fixed size, no beat reaction
 
             ctx.beginPath();
@@ -1402,7 +1423,7 @@
         ctx.restore();
     }
 
-    renderPulseRings() {
+    renderPulseRings(frameData) {
         const ctx = this.ctx;
         const width = this.canvas.width;
         const height = this.canvas.height;
@@ -1411,9 +1432,10 @@
         const centerX = width / 2;
         const centerY = height / 2;
         const maxRadius = Math.max(width, height) * 0.4;
+        const sharpness = frameData.sharpness || 0;
 
-        // Very subtle expanding ring - single ring only
-        const baseAlpha = this.bgState.pulseIntensity * 0.04; // Very subtle
+        // Very subtle expanding ring - single ring only, intensity boosted by sharpness
+        const baseAlpha = this.bgState.pulseIntensity * 0.04 * (1 + sharpness);
 
         if (baseAlpha < 0.005) return; // Skip if too faint
 
@@ -1428,7 +1450,8 @@
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
             ctx.strokeStyle = config.accentColor;
-            ctx.lineWidth = 1;
+            // Sharpness makes the line thinner
+            ctx.lineWidth = Math.max(0.5, 1 - sharpness * 0.5);
             ctx.globalAlpha = alpha;
             ctx.stroke();
         }
@@ -1514,11 +1537,19 @@
         // Calculate visual parameters from smoothed audio values
         const canvasRadius = Math.min(this.canvas.width, this.canvas.height) * 0.48;
         const sizeNorm = config.baseRadius / 150;
-        const scale = 1 + (this.smoothedValues.percussiveImpact * (config.maxScale - 1));
+        
+        // v1.1 features for frame rendering
+        const sharpness = frameData.sharpness || 0;
+        const flux = frameData.spectral_flux || 0;
+        const subBass = frameData.sub_bass || 0;
+        const brilliance = frameData.brilliance || 0;
+
+        // Scale: percussive impact + sharpness spikes
+        const scale = 1 + (this.smoothedValues.percussiveImpact * (config.maxScale - 1)) + (sharpness * 0.2);
         const radius = canvasRadius * sizeNorm * scale;
 
-        // Rotation accumulation (time-based, not frame-based)
-        const rotationDelta = this.smoothedValues.harmonicEnergy * config.rotationSpeed * (deltaTime / 1000);
+        // Rotation accumulation: harmonic energy + brilliance spikes
+        const rotationDelta = (this.smoothedValues.harmonicEnergy + brilliance * 0.5) * config.rotation_speed * (deltaTime / 1000);
         if (isPlaying || this.smoothedValues.harmonicEnergy > 0.1) {
             this.accumulatedRotation += rotationDelta;
         } else {
@@ -1526,14 +1557,15 @@
             this.accumulatedRotation += 0.001 * deltaTime;
         }
 
-        // Polygon sides based on brightness (smoothed)
+        // Polygon sides: brightness (smoothed) + flux spikes
+        const sideBoost = Math.floor(flux * 3);
         const numSides = Math.round(
             config.minSides + this.smoothedValues.spectralBrightness * (config.maxSides - config.minSides)
-        );
+        ) + sideBoost;
 
-        // Thickness based on percussive impact (smoothed)
-        const thickness = config.baseThickness +
-            this.smoothedValues.percussiveImpact * (config.maxThickness - config.baseThickness);
+        // Thickness: percussive impact, but sharpness thins the lines
+        const thickness = (config.baseThickness +
+            this.smoothedValues.percussiveImpact * (config.maxThickness - config.baseThickness)) * (1 - sharpness * 0.4);
 
         // Get color
         let hue;

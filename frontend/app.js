@@ -851,6 +851,36 @@ class KaleidoscopeStudio {
         const highEnergy = highCount > 0 ? highSum / highCount : 0;
         const globalEnergy = totalSum / binCount;
 
+        // v1.1 real-time feature estimation
+        // Sub-bass (approx 20-60Hz)
+        const subBassEnd = Math.floor(60 / nyquist * binCount);
+        let subBassSum = 0;
+        for (let i = 0; i < subBassEnd; i++) subBassSum += this.frequencyData[i] / 255;
+        const subBass = subBassEnd > 0 ? subBassSum / subBassEnd : 0;
+
+        // Brilliance (approx 6000Hz+)
+        const brillianceStart = Math.floor(6000 / nyquist * binCount);
+        let brillianceSum = 0;
+        for (let i = brillianceStart; i < binCount; i++) brillianceSum += this.frequencyData[i] / 255;
+        const brilliance = (binCount - brillianceStart) > 0 ? brillianceSum / (binCount - brillianceStart) : 0;
+
+        // Spectral Flatness (simplified estimation)
+        let logSum = 0;
+        for (let i = 0; i < binCount; i++) logSum += Math.log(Math.max(1e-6, this.frequencyData[i] / 255));
+        const geometricMean = Math.exp(logSum / binCount);
+        const arithmeticMean = globalEnergy;
+        const spectralFlatness = Math.min(1, geometricMean / (arithmeticMean + 1e-6));
+
+        // Spectral Flux (magnitude change since last frame)
+        if (!this._prevFreqData) this._prevFreqData = new Uint8Array(binCount);
+        let fluxSum = 0;
+        for (let i = 0; i < binCount; i++) {
+            const diff = (this.frequencyData[i] - this._prevFreqData[i]) / 255;
+            if (diff > 0) fluxSum += diff;
+        }
+        const spectralFlux = Math.min(1, fluxSum / (binCount / 10));
+        this._prevFreqData.set(this.frequencyData);
+
         // Calculate RMS from time domain for percussive detection
         let rmsSum = 0;
         for (let i = 0; i < this.timeData.length; i++) {
@@ -870,6 +900,9 @@ class KaleidoscopeStudio {
         const centroid = centroidDen > 0 ? centroidNum / centroidDen : 0;
         // Normalize to 0-1 range (assuming max useful centroid around 8000Hz)
         const spectralBrightness = Math.min(1, centroid / 8000);
+
+        // Sharpness (derived from flux and brilliance)
+        const sharpness = Math.min(1, (spectralFlux * 0.6 + brilliance * 0.4) * 1.5);
 
         // Beat detection using energy flux
         const currentEnergy = lowEnergy * 2 + rms; // Weight bass frequencies
@@ -910,6 +943,12 @@ class KaleidoscopeStudio {
             mid_energy: midEnergy,
             high_energy: highEnergy,
             spectral_brightness: spectralBrightness,
+            // v1.1 features
+            sub_bass: subBass,
+            brilliance: brilliance,
+            spectral_flatness: spectralFlatness,
+            spectral_flux: spectralFlux,
+            sharpness: sharpness,
             is_beat: isBeat,
             is_onset: isBeat,
             dominant_chroma: this.dominantChroma
