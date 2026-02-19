@@ -261,17 +261,14 @@ class DecayRenderer:
 
     def render_manifest(self, manifest: dict[str, Any], progress_callback: callable = None) -> Iterator[np.ndarray]:
         for i, frame_data in enumerate(manifest.get("frames", [])):
-            track, vapor = self.get_raw_buffers(frame_data)
-            rgb = self._apply_styles(track, vapor)
-            if self.cfg.glow_enabled: rgb = add_glow(rgb, intensity=min(0.35 + self._smooth_flux * 0.5, 0.9), radius=18)
-            if self.cfg.vignette_strength > 0: rgb = vignette(rgb, strength=self.cfg.vignette_strength * (1.0 + self._smooth_sub_bass * 1.5))
-            yield tone_map_soft(rgb)
+            yield self.render_frame(frame_data, i)
             if progress_callback: progress_callback(i + 1, len(manifest["frames"]))
 
 
 class MirrorRenderer:
     """
     Independent sliding 'plates' compositor. Halves of the visual move and overlap dynamically.
+    Uses sub-pixel interpolation for smooth, jitter-free motion.
     """
     MIRROR_MODES = ["vertical", "horizontal", "diagonal", "circular"]
     INT_MODES = ["resonance", "constructive", "destructive", "sweet_spot"]
@@ -288,51 +285,49 @@ class MirrorRenderer:
         self.transition_alpha = 0.0
         self.change_potential = 0.0
         
-        # Instance A and B
         self.instance_a = DecayRenderer(config, seed=42)
         self.instance_b = DecayRenderer(config, seed=1337)
         
-        # Plate offset vectors
-        self.off_a = np.array([0.0, 0.0]); self.off_b = np.array([0.0, 0.0])
-        self.vel_a = np.array([0.0, 0.0]); self.vel_b = np.array([0.0, 0.0])
+        # Smooth parametric state
+        self.phase_a = 0.0; self.phase_b = 0.0
+        self.dir_a = 1.0; self.dir_b = 1.0
         
         h, w = config.height, config.width
-        self.y, self.x = np.ogrid[:h, :w]
+        self.y, self.x = np.mgrid[0:h, 0:w].astype(np.float32)
 
     def _get_mask(self, mode: str, pulse: float) -> np.ndarray:
-        h, w = self.cfg.height, self.cfg.width; cx, cy = w/2, h/2; grad = 300.0 
+        h, w = self.cfg.height, self.cfg.width; cx, cy = w/2, h/2; grad = 400.0 # Wider overlap
         if mode == "vertical": return np.clip(0.5 - (self.x - (cx + pulse)) / grad, 0, 1)
         elif mode == "horizontal": return np.clip(0.5 - (self.y - (cy + pulse)) / grad, 0, 1)
         elif mode == "diagonal": return np.clip(0.5 - ((self.x - cx) - (self.y - cy) + pulse) / grad, 0, 1)
         else: r = np.sqrt((self.x - cx)**2 + (self.y - cy)**2); return np.clip(0.5 - (r - (200.0 * self.instance_a.ore_scale + pulse)) / grad, 0, 1)
 
-    def _shift(self, buffer: np.ndarray, offset: np.ndarray) -> np.ndarray:
-        """Shift a buffer with wrapping (reversing feel)."""
-        dy, dx = offset.astype(int)
-        return np.roll(np.roll(buffer, dy, axis=0), dx, axis=1)
+    def _smooth_shift(self, buffer: np.ndarray, dy: float, dx: float) -> np.ndarray:
+        """Sub-pixel bilinear shift with wrapping for perfectly smooth motion."""
+        coords = np.array([self.y - dy, self.x - dx])
+        return map_coordinates(buffer, coords, order=1, mode='wrap')
 
     def render_frame(self, frame_data: dict[str, Any], frame_index: int) -> np.ndarray:
         dt = 1.0 / self.cfg.fps; energy = frame_data.get("global_energy", 0.1)
         percussive = frame_data.get("percussive_impact", 0.0)
         is_beat = frame_data.get("is_beat", False)
+        sub_bass = frame_data.get("sub_bass", 0.0)
 
-        # 1. Audio-driven Sliding Physics
-        # Plates drift based on energy, jump on beats
-        drift_speed = 50.0 * energy
-        self.vel_a += np.array([math.sin(self.instance_a.time * 0.5), math.cos(self.instance_a.time * 0.7)]) * drift_speed * dt
-        self.vel_b -= np.array([math.cos(self.instance_a.time * 0.6), math.sin(self.instance_a.time * 0.4)]) * drift_speed * dt
+        # 1. Lissajous Parametric Motion (Smooth, non-hanging)
+        # Direction reversal on sub-bass peaks
+        if sub_bass > 0.7:
+            self.dir_a *= -1.0; self.dir_b *= -1.0
+            
+        self.phase_a += dt * (0.4 + energy * 1.2) * self.dir_a
+        self.phase_b += dt * (0.3 + energy * 1.0) * self.dir_b
         
-        if is_beat:
-            # Reversal / Kick
-            self.vel_a *= -1.2; self.vel_b *= -1.2
-            kick = 200.0 * percussive
-            self.off_a += self.vel_a * kick * dt
-            self.off_b += self.vel_b * kick * dt
-
-        self.off_a += self.vel_a; self.off_b += self.vel_b
-        self.vel_a *= 0.92; self.vel_b *= 0.92 # Friction
-
-        # 2. Mode Cycling Logic
+        # Plate Offsets (Float)
+        off_a_x = math.sin(self.phase_a) * (self.cfg.width * 0.3)
+        off_a_y = math.cos(self.phase_a * 0.7) * (self.cfg.height * 0.3)
+        off_b_x = math.cos(self.phase_b * 1.1) * (self.cfg.width * 0.3)
+        off_b_y = math.sin(self.phase_b * 0.9) * (self.cfg.height * 0.3)
+        
+        # 2. Mode Cycling
         if self.requested_split == "cycle" or self.requested_int == "cycle":
             self.change_potential += energy * dt * 1.5
             if self.change_potential > 1.0 and self.transition_alpha <= 0:
@@ -344,15 +339,15 @@ class MirrorRenderer:
                 if self.transition_alpha >= 1.0:
                     self.curr_split_idx = self.next_split_idx; self.curr_int_idx = self.next_int_idx; self.transition_alpha = 0.0
 
-        # 3. Get raw buffers and Shift them
+        # 3. Get and Smoothly Shift
         t_a, v_a = self.instance_a.get_raw_buffers(frame_data)
         t_b, v_b = self.instance_b.get_raw_buffers(frame_data)
         
-        t_a_s, v_a_s = self._shift(t_a, self.off_a), self._shift(v_a, self.off_a)
-        t_b_s, v_b_s = self._shift(t_b, self.off_b), self._shift(v_b, self.off_b)
+        t_a_s = self._smooth_shift(t_a, off_a_y, off_a_x); v_a_s = self._smooth_shift(v_a, off_a_y, off_a_x)
+        t_b_s = self._smooth_shift(t_b, off_b_y, off_b_x); v_b_s = self._smooth_shift(v_b, off_b_y, off_b_x)
         
-        # 4. Masking & Interference
-        pulse = math.sin(self.instance_a.time * 2) * 40 * self.instance_a._smooth_energy
+        # 4. Composite & Interference
+        pulse = math.sin(self.instance_a.time * 2) * 50 * self.instance_a._smooth_energy
         mask_a_curr = self._get_mask(self.MIRROR_MODES[self.curr_split_idx], pulse)
         mask_a_next = self._get_mask(self.MIRROR_MODES[self.next_split_idx], pulse)
         mask_a = mask_a_curr * (1 - self.transition_alpha) + mask_a_next * self.transition_alpha
@@ -364,7 +359,7 @@ class MirrorRenderer:
             elif mode == "destructive": return np.abs(a - b) * 2.0
             else: return np.maximum(a, b) + (a * b * 4.0)
 
-        overlap = np.clip(1.0 - np.abs(mask_a - 0.5) * 1.2, 0, 1)
+        overlap = np.clip(1.0 - np.abs(mask_a - 0.5) * 1.5, 0, 1)
         track_int = compute_int(t_a_s, t_b_s, self.INT_MODES[self.curr_int_idx]) * (1-self.transition_alpha) + \
                     compute_int(t_a_s, t_b_s, self.INT_MODES[self.next_int_idx]) * self.transition_alpha
         vapor_int = compute_int(v_a_s, v_b_s, self.INT_MODES[self.curr_int_idx]) * (1-self.transition_alpha) + \
@@ -373,7 +368,6 @@ class MirrorRenderer:
         track_final = (t_a_s * mask_a * (1-overlap)) + (t_b_s * mask_b * (1-overlap)) + track_int * overlap
         vapor_final = (v_a_s * mask_a * (1-overlap)) + (v_b_s * mask_b * (1-overlap)) + vapor_int * overlap
         
-        # 5. Styling
         rgb = self.instance_a._apply_styles(track_final, vapor_final)
         if self.cfg.glow_enabled: rgb = add_glow(rgb, intensity=min(0.35 + self.instance_a._smooth_flux * 0.5, 0.9), radius=18)
         if self.cfg.vignette_strength > 0: rgb = vignette(rgb, strength=self.cfg.vignette_strength * (1.0 + self.instance_a._smooth_sub_bass * 1.5))
@@ -381,7 +375,7 @@ class MirrorRenderer:
 
     def render_manifest(self, manifest: dict[str, Any], progress_callback: callable = None) -> Iterator[np.ndarray]:
         self.instance_a = DecayRenderer(self.cfg, seed=42); self.instance_b = DecayRenderer(self.cfg, seed=1337)
-        self.off_a *= 0; self.off_b *= 0; self.vel_a *= 0; self.vel_b *= 0
+        self.phase_a = 0.0; self.phase_b = 0.0; self.dir_a = 1.0; self.dir_b = 1.0
         for i, frame_data in enumerate(manifest.get("frames", [])):
             yield self.render_frame(frame_data, i)
             if progress_callback: progress_callback(i + 1, len(manifest["frames"]))
