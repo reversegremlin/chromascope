@@ -60,20 +60,28 @@ def main():
 
     # Visual
     parser.add_argument(
-        "--base-cpm", type=int, default=6000,
-        help="Baseline simulated event rate (default: 6000)",
+        "--base-cpm", type=int, default=12000,
+        help="Baseline simulated event rate (default: 12000)",
     )
     parser.add_argument(
-        "--persistence", type=float, default=0.92,
-        help="Trail persistence [0.0-1.0] (default: 0.92)",
+        "--persistence", type=float, default=0.95,
+        help="Trail persistence [0.0-1.0] (default: 0.95)",
     )
     parser.add_argument(
-        "--diffusion", type=float, default=0.05,
-        help="Spatial diffusion factor [0.0-1.0] (default: 0.05)",
+        "--vapor-persistence", type=float, default=0.98,
+        help="Vapor lingering persistence [0.0-1.0] (default: 0.98)",
     )
     parser.add_argument(
-        "--ionization-gain", type=float, default=1.0,
-        help="Ionization intensity gain multiplier (default: 1.0)",
+        "--diffusion", type=float, default=0.08,
+        help="Spatial diffusion factor [0.0-1.0] (default: 0.08)",
+    )
+    parser.add_argument(
+        "--ionization-gain", type=float, default=1.2,
+        help="Ionization intensity gain multiplier (default: 1.2)",
+    )
+    parser.add_argument(
+        "--distortion", type=float, default=0.15,
+        help="Vapor distortion strength [0.0-1.0] (default: 0.15)",
     )
     parser.add_argument(
         "--style", type=str, default="uranium",
@@ -154,8 +162,10 @@ def main():
         fps=fps,
         base_cpm=args.base_cpm,
         trail_persistence=args.persistence,
-        diffusion=args.diffusion,
+        vapor_persistence=args.vapor_persistence,
+        base_diffusion=args.diffusion,
         ionization_gain=args.ionization_gain,
+        distortion_strength=args.distortion,
         style=args.style,
         glow_enabled=not args.no_glow,
     )
