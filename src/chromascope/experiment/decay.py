@@ -382,13 +382,25 @@ class DecayRenderer:
 class MirrorRenderer:
     """
     Manages two independent DecayRenderer instances and composites them
-    using spatial splits and interference logic.
+    using spatial splits and interference logic. Supports smooth music-driven cycling.
     """
+    MIRROR_MODES = ["vertical", "horizontal", "diagonal", "circular"]
+    INT_MODES = ["resonance", "constructive", "destructive", "sweet_spot"]
+
     def __init__(self, config: DecayConfig, split_mode: str = "vertical", 
                  interference_mode: str = "resonance"):
         self.cfg = config
-        self.split_mode = split_mode # vertical, horizontal, diagonal, circular
-        self.int_mode = interference_mode # resonance, constructive, destructive, difference
+        self.requested_split = split_mode
+        self.requested_int = interference_mode
+        
+        # Current active modes and transition state
+        self.curr_split_idx = 0 if split_mode == "cycle" else self.MIRROR_MODES.index(split_mode)
+        self.next_split_idx = self.curr_split_idx
+        self.curr_int_idx = 0 if interference_mode == "cycle" else self.INT_MODES.index(interference_mode)
+        self.next_int_idx = self.curr_int_idx
+        
+        self.transition_alpha = 0.0 # 0 to 1
+        self.change_potential = 0.0 # Accumulates to trigger change
         
         # Instance A and B (different seeds for independence)
         self.instance_a = DecayRenderer(config, seed=42)
@@ -397,68 +409,86 @@ class MirrorRenderer:
         h, w = config.height, config.width
         self.y, self.x = np.ogrid[:h, :w]
 
-    def _generate_masks(self, frame_data: dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_mask(self, mode: str, pulse: float) -> np.ndarray:
         h, w = self.cfg.height, self.cfg.width
         cx, cy = w/2, h/2
         
-        # Pulse the split line slightly to music
-        pulse = math.sin(self.instance_a.time * 2) * 20 * self.instance_a._smooth_energy
-        
-        if self.split_mode == "vertical":
+        if mode == "vertical":
             dist_field = self.x - (cx + pulse)
-            mask_a = np.clip(0.5 - dist_field / 100.0, 0, 1)
-            mask_b = np.clip(0.5 + dist_field / 100.0, 0, 1)
-        elif self.split_mode == "horizontal":
+            return np.clip(0.5 - dist_field / 100.0, 0, 1)
+        elif mode == "horizontal":
             dist_field = self.y - (cy + pulse)
-            mask_a = np.clip(0.5 - dist_field / 100.0, 0, 1)
-            mask_b = np.clip(0.5 + dist_field / 100.0, 0, 1)
-        elif self.split_mode == "diagonal":
+            return np.clip(0.5 - dist_field / 100.0, 0, 1)
+        elif mode == "diagonal":
             dist_field = (self.x - cx) - (self.y - cy) + pulse
-            mask_a = np.clip(0.5 - dist_field / 100.0, 0, 1)
-            mask_b = np.clip(0.5 + dist_field / 100.0, 0, 1)
+            return np.clip(0.5 - dist_field / 100.0, 0, 1)
         else: # circular
-            r = np.sqrt((self.x - cx)**2 + (self.y - cy)**2)
-            # Split at 1.5x current ore size
+            r = np.sqrt((self.x - cx)**2 + (y - cy)**2)
             boundary = 150.0 * self.instance_a.ore_scale + pulse
-            mask_a = np.clip(0.5 - (r - boundary) / 100.0, 0, 1)
-            mask_b = np.clip(0.5 + (r - boundary) / 100.0, 0, 1)
-            
-        return mask_a, mask_b
+            return np.clip(0.5 - (r - boundary) / 100.0, 0, 1)
+
+    def _apply_interference(self, a: np.ndarray, b: np.ndarray, mode: str) -> np.ndarray:
+        if mode == "resonance":
+            return (a * b) * 4.0
+        elif mode == "constructive":
+            return (a + b) * 0.5
+        elif mode == "destructive":
+            return np.abs(a - b)
+        else: # sweet_spot
+            return (a * b * 3.0) + np.maximum(a, b) * 0.2
 
     def render_frame(self, frame_data: dict[str, Any], frame_index: int) -> np.ndarray:
-        # 1. Get raw buffers from both independent instances
+        # 1. Update Transition Logic
+        dt = 1.0 / self.cfg.fps
+        energy = frame_data.get("global_energy", 0.1)
+        
+        # Accumulate potential based on music energy
+        # Higher energy = faster cycling
+        if self.requested_split == "cycle" or self.requested_int == "cycle":
+            self.change_potential += energy * dt * 0.5
+            
+            # Trigger transition if potential is high and we aren't already transitioning
+            if self.change_potential > 1.0 and self.transition_alpha <= 0:
+                self.change_potential = 0
+                if self.requested_split == "cycle":
+                    self.next_split_idx = (self.curr_split_idx + 1) % len(self.MIRROR_MODES)
+                if self.requested_int == "cycle":
+                    self.next_int_idx = (self.curr_int_idx + 1) % len(self.INT_MODES)
+            
+            # Progress transition
+            if self.next_split_idx != self.curr_split_idx or self.next_int_idx != self.curr_int_idx:
+                self.transition_alpha += dt * 0.5 # 2-second transition
+                if self.transition_alpha >= 1.0:
+                    self.curr_split_idx = self.next_split_idx
+                    self.curr_int_idx = self.next_int_idx
+                    self.transition_alpha = 0.0
+
+        # 2. Get raw buffers from both independent instances
         t_a, v_a = self.instance_a.get_raw_buffers(frame_data)
         t_b, v_b = self.instance_b.get_raw_buffers(frame_data)
         
-        # 2. Generate spatial masks for A and B
-        mask_a, mask_b = self._generate_masks(frame_data)
+        # 3. Generate spatial masks
+        pulse = math.sin(self.instance_a.time * 2) * 20 * self.instance_a._smooth_energy
         
-        # 3. Interference logic
-        # Resonance (Multiplicative): Shows where both are high (The "Sweet Spot")
-        # Constructive (Additive): Combined energy
-        # Destructive (Difference): Energy where they vary
+        mask_a_curr = self._get_mask(self.MIRROR_MODES[self.curr_split_idx], pulse)
+        mask_a_next = self._get_mask(self.MIRROR_MODES[self.next_split_idx], pulse)
+        mask_a = mask_a_curr * (1 - self.transition_alpha) + mask_a_next * self.transition_alpha
+        mask_b = 1.0 - mask_a
         
-        def compute_interference(a, b):
-            if self.int_mode == "resonance":
-                return (a * b) * 4.0 # Boost resonance
-            elif self.int_mode == "constructive":
-                return (a + b) * 0.5
-            elif self.int_mode == "destructive":
-                return np.abs(a - b)
-            else: # "sweet_spot" hybrid
-                return np.maximum(a * mask_a, b * mask_b) + (a * b * 2.0)
+        # 4. Compute Interference with smooth blending
+        def blended_interference(a, b):
+            int_curr = self._apply_interference(a, b, self.INT_MODES[self.curr_int_idx])
+            int_next = self._apply_interference(a, b, self.INT_MODES[self.next_int_idx])
+            return int_curr * (1 - self.transition_alpha) + int_next * self.transition_alpha
 
-        # Composite track and vapor buffers with interference in the overlap
-        # overlap zone is where mask_a * mask_b > 0
-        overlap = mask_a * mask_b
+        overlap = np.clip(1.0 - np.abs(mask_a - 0.5) * 2.0, 0, 1)
         
-        track_final = (t_a * mask_a * (1-overlap)) + (t_b * mask_b * (1-overlap)) + compute_interference(t_a, t_b) * overlap
-        vapor_final = (v_a * mask_a * (1-overlap)) + (v_b * mask_b * (1-overlap)) + compute_interference(v_a, v_b) * overlap
+        track_final = (t_a * mask_a * (1-overlap)) + (t_b * mask_b * (1-overlap)) + blended_interference(t_a, t_b) * overlap
+        vapor_final = (v_a * mask_a * (1-overlap)) + (v_b * mask_b * (1-overlap)) + blended_interference(v_a, v_b) * overlap
         
-        # 4. Style the final composite buffer using instance_a's color state (synchronized)
+        # 5. Style and Post
         rgb = self.instance_a._apply_styles(track_final, vapor_final)
         
-        # 5. Final post-processing
         cfg = self.cfg
         if cfg.glow_enabled:
             g_int = 0.35 + self.instance_a._smooth_flux * 0.5 + self.instance_a._smooth_harmonic * 0.3

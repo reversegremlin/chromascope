@@ -92,12 +92,12 @@ def main():
     # Mirror & Interference
     parser.add_argument(
         "--mirror", type=str, default=None,
-        choices=["vertical", "horizontal", "diagonal", "circular"],
+        choices=["vertical", "horizontal", "diagonal", "circular", "cycle"],
         help="Split and overlap two independent simulations",
     )
     parser.add_argument(
         "--interference", type=str, default="resonance",
-        choices=["resonance", "constructive", "destructive", "sweet_spot"],
+        choices=["resonance", "constructive", "destructive", "sweet_spot", "cycle"],
         help="Math for the overlap zone (default: resonance)",
     )
 

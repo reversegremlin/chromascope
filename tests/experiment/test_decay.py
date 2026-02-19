@@ -96,3 +96,20 @@ def test_mirror_renderer():
     # Both instances should have particles
     assert len(renderer.instance_a.particles) > 0
     assert len(renderer.instance_b.particles) > 0
+
+def test_mirror_renderer_cycle():
+    config = DecayConfig(width=100, height=100)
+    renderer = MirrorRenderer(config, split_mode="cycle", interference_mode="cycle")
+    
+    frame_data = {"global_energy": 1.0}
+    
+    # Run many frames to trigger a cycle change
+    # potential accumulates at energy * dt * 0.5
+    # energy=1.0, dt=1/60 => 1/120 per frame
+    # 120 frames = 1.0 potential => triggers transition
+    for i in range(130):
+        renderer.render_frame(frame_data, i)
+        
+    # Should be in transition now
+    assert renderer.transition_alpha > 0
+    assert renderer.next_split_idx != renderer.curr_split_idx
