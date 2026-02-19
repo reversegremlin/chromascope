@@ -9,7 +9,7 @@ Translates music into a field of radioactive trails:
 
 Dynamic Sliding Mirror Architecture:
 - Moving "Plates": Two halves of the visual field slide independently.
-- Content Masking: Simulation A is masked to the "Left", B to the "Right" (or other splits).
+- Content Masking: Simulation A is masked to the "Left", B to the "Right".
 - Spatial Overlap: These "half-visuals" move into and through each other.
 - Interference: New patterns emerge ONLY where the two sliding plates collide.
 """
@@ -85,13 +85,11 @@ class DecayRenderer:
         self.np_rng = np.random.default_rng(seed)
         self.center_pos = center_pos or (self.cfg.width / 2, self.cfg.height / 2)
         
-        # State
         self.particles: List[Particle] = []
         self.time = 0.0
         self.track_buffer = np.zeros((self.cfg.height, self.cfg.width), dtype=np.float32)
         self.vapor_buffer = np.zeros((self.cfg.height, self.cfg.width), dtype=np.float32)
         
-        # Smoothed audio
         self._smooth_energy = 0.1
         self._smooth_percussive = 0.0
         self._smooth_harmonic = 0.2
@@ -232,10 +230,8 @@ class DecayRenderer:
                 draw_t.line([(tlx, tly), (tx, ty)], fill=color, width=max(1, thickness // 2))
                 draw_v.line([(tlx, tly), (tx, ty)], fill=color * 0.6, width=thickness)
 
-        current_t = self._apply_vapor_distortion(np.array(track_img))
-        current_v = self._apply_vapor_distortion(np.array(vapor_img))
-        self.track_buffer = np.maximum(self.track_buffer, current_t)
-        self.vapor_buffer = np.maximum(self.vapor_buffer, current_v)
+        self.track_buffer = np.maximum(self.track_buffer, np.array(track_img))
+        self.vapor_buffer = np.maximum(self.vapor_buffer, np.array(vapor_img))
         return self.track_buffer, self.vapor_buffer
 
     def _hsv_to_rgb(self, h: float, s: float, v: np.ndarray) -> np.ndarray:
@@ -249,17 +245,22 @@ class DecayRenderer:
         else: r, g, b = c, 0, x
         return np.stack([r + m, g + m, b + m], axis=-1)
 
-    def _apply_styles(self, track: np.ndarray, vapor: np.ndarray) -> np.ndarray:
+    def _apply_styles(self, track: np.ndarray, vapor: np.ndarray, dist_field: np.ndarray | None = None) -> np.ndarray:
         style = self.cfg.style; h, w = self.cfg.height, self.cfg.width; cx, cy = w/2, h/2
-        y, x = np.ogrid[:h, :w]; dist = np.sqrt((x - cx)**2 + (y - cy)**2)
-        shift_mask = np.clip((dist / (50.0 * self.ore_scale) - 1.2) / 1.5, 0, 1)
+        
+        if dist_field is None:
+            y, x = np.ogrid[:h, :w]
+            dist_field = np.sqrt((x - cx)**2 + (y - cy)**2)
+            
+        shift_mask = np.clip((dist_field / (50.0 * self.ore_scale) - 1.2) / 1.5, 0, 1)
         hue_base = (self.time * 0.05 + self._smooth_centroid * 0.5) % 1.0
         hue_tip = (hue_base + 0.33 + self._smooth_harmonic * 0.2) % 1.0
+        
         if style in ["uranium", "neon"]:
             rgb_in = self._hsv_to_rgb(hue_base, 0.8 + self._smooth_energy * 0.2, np.clip(track * 1.5 + vapor * 0.8, 0, 1))
             rgb_out = self._hsv_to_rgb(hue_tip, 0.6 + self._smooth_brilliance * 0.4, np.clip(track * 1.0 + vapor * 1.2, 0, 1))
             rgb = rgb_in * (1 - shift_mask[:,:,None]) + rgb_out * shift_mask[:,:,None]
-            heat_mask = np.exp(-dist / (60.0 * self.ore_scale))
+            heat_mask = np.exp(-dist_field / (60.0 * self.ore_scale))
             rgb_heat = self._hsv_to_rgb((hue_base - 0.1) % 1.0, 1.0, heat_mask * (0.8 + self._smooth_sub_bass))
             rgb = np.maximum(rgb, rgb_heat)
         elif style == "noir":
@@ -285,6 +286,7 @@ class DecayRenderer:
 class MirrorRenderer:
     """
     Dynamic Sliding Plate Compositor. Two halves of the world slide and overlap.
+    Corrects styling distance field to follow shifted ores.
     """
     MIRROR_MODES = ["vertical", "horizontal", "diagonal", "circular"]
     INT_MODES = ["resonance", "constructive", "destructive", "sweet_spot"]
@@ -311,7 +313,6 @@ class MirrorRenderer:
         self.yg, self.xg = np.mgrid[0:h, 0:w].astype(np.float32)
 
     def _get_identity_mask(self, mode: str) -> np.ndarray:
-        """Create the source mask that defines the identity of simulation A."""
         h, w = self.cfg.height, self.cfg.width; cx, cy = w/2, h/2; grad = 100.0
         if mode == "vertical": return np.clip(0.5 - (self.xg - cx) / grad, 0, 1)
         elif mode == "horizontal": return np.clip(0.5 - (self.yg - cy) / grad, 0, 1)
@@ -325,18 +326,15 @@ class MirrorRenderer:
     def render_frame(self, frame_data: dict[str, Any], frame_index: int) -> np.ndarray:
         dt = 1.0 / self.cfg.fps; energy = frame_data.get("global_energy", 0.1); sub_bass = frame_data.get("sub_bass", 0.0)
         
-        # 1. Physics & Panning Logic
         if sub_bass > 0.7: self.dir_a *= -1.0; self.dir_b *= -1.0
         self.phase_a += dt * (0.5 + energy * 1.5) * self.dir_a
         self.phase_b += dt * (0.4 + energy * 1.2) * self.dir_b
         
-        # Large sweeps to ensure plates cross through the middle
         off_a_x = math.sin(self.phase_a) * (self.cfg.width * 0.4)
         off_a_y = math.cos(self.phase_a * 0.7) * (self.cfg.height * 0.4)
         off_b_x = math.cos(self.phase_b * 1.1) * (self.cfg.width * 0.4)
         off_b_y = math.sin(self.phase_b * 0.9) * (self.cfg.height * 0.4)
 
-        # 2. Cycle Logic
         if self.requested_split == "cycle" or self.requested_int == "cycle":
             self.change_potential += energy * dt * 1.5
             if self.change_potential > 1.0 and self.transition_alpha <= 0:
@@ -345,19 +343,18 @@ class MirrorRenderer:
                 if self.requested_int == "cycle": self.next_int_idx = (self.curr_int_idx + 1) % len(self.INT_MODES)
             if self.next_split_idx != self.curr_split_idx or self.next_int_idx != self.curr_int_idx:
                 self.transition_alpha += dt * 0.6
-                if self.transition_alpha >= 1.0: self.curr_split_idx = self.next_split_idx; self.curr_int_idx = self.next_int_idx; self.transition_alpha = 0.0
+                if self.transition_alpha >= 1.0:
+                    self.curr_split_idx = self.next_split_idx; self.curr_int_idx = self.next_int_idx; self.transition_alpha = 0.0
 
-        # 3. Get raw and Shift with their Identity Masks
         t_a, v_a = self.instance_a.get_raw_buffers(frame_data)
         t_b, v_b = self.instance_b.get_raw_buffers(frame_data)
         
-        # Create Identity Masks (e.g. A is Left, B is Right)
         mask_src_a_curr = self._get_identity_mask(self.MIRROR_MODES[self.curr_split_idx])
         mask_src_a_next = self._get_identity_mask(self.MIRROR_MODES[self.next_split_idx])
         mask_src_a = mask_src_a_curr * (1 - self.transition_alpha) + mask_src_a_next * self.transition_alpha
         mask_src_b = 1.0 - mask_src_a
         
-        # Shift everything: Content AND its Identity
+        # Shift buffers
         t_a_s = self._smooth_shift(t_a * mask_src_a, off_a_y, off_a_x)
         v_a_s = self._smooth_shift(v_a * mask_src_a, off_a_y, off_a_x)
         mask_a_s = self._smooth_shift(mask_src_a, off_a_y, off_a_x)
@@ -366,26 +363,33 @@ class MirrorRenderer:
         v_b_s = self._smooth_shift(v_b * mask_src_b, off_b_y, off_b_x)
         mask_b_s = self._smooth_shift(mask_src_b, off_b_y, off_b_x)
         
-        # 4. Overlap & Interference
-        # The collision zone is where both shifted identity masks are active
-        overlap = np.clip(mask_a_s * mask_b_s * 4.0, 0, 1) # Wide overlap
+        # Shift Distance Fields so tips move with ores
+        cx, cy = self.cfg.width/2, self.cfg.height/2
+        dist_base = np.sqrt((self.xg - cx)**2 + (self.yg - cy)**2)
+        dist_a_s = self._smooth_shift(dist_base, off_a_y, off_a_x)
+        dist_b_s = self._smooth_shift(dist_base, off_b_y, off_b_x)
+        
+        # Combine distance field: nearest ore wins for styling
+        dist_final = np.minimum(dist_a_s, dist_b_s)
+        
+        overlap = np.clip(mask_a_s * mask_b_s * 4.0, 0, 1)
         
         def compute_int(a, b, mode):
-            if mode == "resonance": return (a * b) * 8.0
+            if mode == "resonance": return (a * b) * 10.0 # Violent boost
             elif mode == "constructive": return (a + b) * 0.8
-            elif mode == "destructive": return np.abs(a - b) * 3.0
-            else: return np.maximum(a, b) + (a * b * 5.0)
+            elif mode == "destructive": return np.abs(a - b) * 4.0
+            else: return np.maximum(a, b) + (a * b * 6.0)
 
         track_int = compute_int(t_a_s, t_b_s, self.INT_MODES[self.curr_int_idx]) * (1-self.transition_alpha) + \
                     compute_int(t_a_s, t_b_s, self.INT_MODES[self.next_int_idx]) * self.transition_alpha
         vapor_int = compute_int(v_a_s, v_b_s, self.INT_MODES[self.curr_int_idx]) * (1-self.transition_alpha) + \
                     compute_int(v_a_s, v_b_s, self.INT_MODES[self.next_int_idx]) * self.transition_alpha
 
-        # Composite based on shifted identity
         track_final = (t_a_s * (1-overlap)) + (t_b_s * (1-overlap)) + (track_int * overlap)
         vapor_final = (v_a_s * (1-overlap)) + (v_b_s * (1-overlap)) + (vapor_int * overlap)
         
-        rgb = self.instance_a._apply_styles(track_final, vapor_final)
+        # Style with combined and shifted distance field
+        rgb = self.instance_a._apply_styles(track_final, vapor_final, dist_field=dist_final)
         if self.cfg.glow_enabled: rgb = add_glow(rgb, intensity=min(0.35 + self.instance_a._smooth_flux * 0.5, 0.9), radius=18)
         if self.cfg.vignette_strength > 0: rgb = vignette(rgb, strength=self.cfg.vignette_strength * (1.0 + self.instance_a._smooth_sub_bass * 1.5))
         return tone_map_soft(rgb)
