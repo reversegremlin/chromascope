@@ -326,6 +326,7 @@ class MirrorRenderer:
         self.instance_b = DecayRenderer(config, seed=1337)
         
         self.phase = 0.0
+        self.phase_dir = 1.0
         h, w = config.height, config.width
         self.yg, self.xg = np.mgrid[0:h, 0:w].astype(np.float32)
 
@@ -345,40 +346,40 @@ class MirrorRenderer:
         is_beat = frame_data.get("is_beat", False); percussive = frame_data.get("percussive_impact", 0.0)
         sub_bass = frame_data.get("sub_bass", 0.0)
         
-        # 1. Update State - Synchronized Motion & Reversals
+        # 1. Update State - Cinematic slow sweep
         # Beat-locked reversals
-        if is_beat and sub_bass > 0.6: self.phase_dir = -getattr(self, 'phase_dir', 1.0)
-        else: self.phase_dir = getattr(self, 'phase_dir', 1.0)
+        if is_beat and sub_bass > 0.7: self.phase_dir = -self.phase_dir
         
-        # Audio-reactive phase increment with beat "shiver"
-        p_inc = (0.12 + energy * 0.35) * self.phase_dir
-        if is_beat: p_inc *= (1.5 + percussive * 2.0)
+        # Much slower base phase (0.04 to 0.15) for grand motion
+        p_inc = (0.04 + energy * 0.15) * self.phase_dir
+        if is_beat: p_inc *= (1.2 + percussive * 1.5)
         self.phase += dt * p_inc
         
         # 2. Beat-Locked Mode Cycling
         if self.requested_split == "cycle" or self.requested_int == "cycle":
             self.change_potential += energy * dt * 2.0
-            # Wait for both threshold AND a beat to trigger change
             if self.change_potential > 0.85 and is_beat and self.transition_alpha <= 0:
                 self.change_potential = 0
                 if self.requested_split == "cycle": self.next_split_idx = (self.curr_split_idx + 1) % len(self.MIRROR_MODES)
                 if self.requested_int == "cycle": self.next_int_idx = (self.curr_int_idx + 1) % len(self.INT_MODES)
             
             if self.next_split_idx != self.curr_split_idx or self.next_int_idx != self.curr_int_idx:
-                self.transition_alpha += dt * 0.7
+                self.transition_alpha += dt * 0.6
                 if self.transition_alpha >= 1.0:
                     self.curr_split_idx = self.next_split_idx; self.curr_int_idx = self.next_int_idx; self.transition_alpha = 0.0
 
-        # 3. Determine strictly symmetrical panning axis
+        # 3. Axis-Locked Symmetrical Clashing
         mode = self.MIRROR_MODES[self.curr_split_idx]
-        amp_x, amp_y = self.cfg.width * 0.45, self.cfg.height * 0.45
+        # Smaller amplitude (25% instead of 45%) to keep ores central
+        amp_x, amp_y = self.cfg.width * 0.25, self.cfg.height * 0.25
         
         if mode == "vertical": axis_x, axis_y = 1.0, 0.0
         elif mode == "horizontal": axis_x, axis_y = 0.0, 1.0
         elif mode == "diagonal": axis_x, axis_y = 1.0, 1.0
-        else: axis_x, axis_y = 1.0, -1.0 # Circular mode slides along opposite diagonal
+        else: axis_x, axis_y = 1.0, -1.0 
         
-        # strictly opposite oscillation around center
+        # Oscillation between Edges (-1) and Max Overlap (1)
+        # Meeting at Center (0)
         osc = math.sin(self.phase)
         off_a_x, off_a_y = axis_x * osc * amp_x, axis_y * osc * amp_y
         off_b_x, off_b_y = -off_a_x, -off_a_y
