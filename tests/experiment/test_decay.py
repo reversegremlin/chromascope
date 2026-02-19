@@ -32,7 +32,8 @@ def test_render_frame():
         "is_beat": True,
         "spectral_flux": 0.5,
         "harmonic_energy": 0.4,
-        "sub_bass": 0.3
+        "sub_bass": 0.3,
+        "spectral_centroid": 0.5
     }
     frame = renderer.render_frame(frame_data, 0)
     assert frame.shape == (100, 100, 3)
@@ -44,8 +45,8 @@ def test_render_manifest():
     renderer = DecayRenderer(DecayConfig(width=100, height=100))
     manifest = {
         "frames": [
-            {"global_energy": 0.1, "is_beat": False},
-            {"global_energy": 0.9, "is_beat": True}
+            {"global_energy": 0.1, "is_beat": False, "spectral_centroid": 0.5},
+            {"global_energy": 0.9, "is_beat": True, "spectral_centroid": 0.5}
         ]
     }
     frames = list(renderer.render_manifest(manifest))
@@ -88,7 +89,8 @@ def test_mirror_renderer():
         "is_beat": True,
         "spectral_flux": 0.5,
         "harmonic_energy": 0.4,
-        "sub_bass": 0.3
+        "sub_bass": 0.3,
+        "spectral_centroid": 0.5
     }
     
     frame = renderer.render_frame(frame_data, 0)
@@ -101,13 +103,13 @@ def test_mirror_renderer_cycle():
     config = DecayConfig(width=100, height=100)
     renderer = MirrorRenderer(config, split_mode="cycle", interference_mode="cycle")
     
-    frame_data = {"global_energy": 1.0}
+    frame_data = {"global_energy": 1.0, "spectral_centroid": 0.5}
     
-    # Run many frames to trigger a cycle change
-    # potential accumulates at energy * dt * 0.5
-    # energy=1.0, dt=1/60 => 1/120 per frame
-    # 120 frames = 1.0 potential => triggers transition
-    for i in range(130):
+    # Potential growth is now 3x faster (1.5 instead of 0.5)
+    # potential accumulates at energy * dt * 1.5
+    # energy=1.0, dt=1/60 => 1.5/60 = 1/40 per frame
+    # 40 frames = 1.0 potential => triggers transition
+    for i in range(50):
         renderer.render_frame(frame_data, i)
         
     # Should be in transition now
