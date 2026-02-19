@@ -350,9 +350,9 @@ class MirrorRenderer:
         # Beat-locked reversals
         if is_beat and sub_bass > 0.7: self.phase_dir = -self.phase_dir
         
-        # Much slower base phase (0.04 to 0.15) for grand motion
-        p_inc = (0.04 + energy * 0.15) * self.phase_dir
-        if is_beat: p_inc *= (1.2 + percussive * 1.5)
+        # Even slower phase (0.02 to 0.1) for full-width traversal
+        p_inc = (0.02 + energy * 0.08) * self.phase_dir
+        if is_beat: p_inc *= (1.1 + percussive * 1.2)
         self.phase += dt * p_inc
         
         # 2. Beat-Locked Mode Cycling
@@ -368,10 +368,10 @@ class MirrorRenderer:
                 if self.transition_alpha >= 1.0:
                     self.curr_split_idx = self.next_split_idx; self.curr_int_idx = self.next_int_idx; self.transition_alpha = 0.0
 
-        # 3. Axis-Locked Symmetrical Clashing
+        # 3. Axis-Locked Symmetrical Clashing (Full Traversal)
         mode = self.MIRROR_MODES[self.curr_split_idx]
-        # Smaller amplitude (25% instead of 45%) to keep ores central
-        amp_x, amp_y = self.cfg.width * 0.25, self.cfg.height * 0.25
+        # Full Amplitude (50%) - Plates start at edges, meet at center, cross through
+        amp_x, amp_y = self.cfg.width * 0.5, self.cfg.height * 0.5
         
         if mode == "vertical": axis_x, axis_y = 1.0, 0.0
         elif mode == "horizontal": axis_x, axis_y = 0.0, 1.0
