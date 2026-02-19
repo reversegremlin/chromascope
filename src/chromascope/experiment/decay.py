@@ -238,29 +238,74 @@ class DecayRenderer:
 
     def _apply_styles(self, track: np.ndarray, vapor: np.ndarray) -> np.ndarray:
         style = self.cfg.style
-        # Composite tracks and vapor
-        # Vapor is greenish, tracks are white/hot
+        h, w = self.cfg.height, self.cfg.width
+        cx, cy = w/2, h/2
         
+        # Calculate distance field for color transitions
+        y, x = np.ogrid[:h, :w]
+        dist = np.sqrt((x - cx)**2 + (y - cy)**2)
+        
+        # Core size baseline
+        core_radius = 50.0 * self.ore_scale
+        # Transition starts at 1.0x core radius, fully shifts by 2.0x
+        # This captures "half or more of the size of the center"
+        dist_norm = dist / core_radius
+        shift_mask = np.clip((dist_norm - 1.2) / 1.0, 0, 1)
+        
+        # Harmonic modulation of the color shift
+        h_mod = self._smooth_harmonic * 0.5
+        shift_mask = np.clip(shift_mask + h_mod, 0, 1)
+
         if style == "uranium":
-            r = track * 0.4 + vapor * 0.1
-            g = track * 1.0 + vapor * 0.8
-            b = track * 0.2 + vapor * 0.1
+            # Inner: Radioactive Emerald
+            r_in = track * 0.35 + vapor * 0.1
+            g_in = track * 1.0 + vapor * 0.8
+            b_in = track * 0.2 + vapor * 0.1
             
-            # Sub-bass heat
-            y, x = np.ogrid[:self.cfg.height, :self.cfg.width]
-            dist = np.sqrt((x - self.cfg.width/2)**2 + (y - self.cfg.height/2)**2)
-            heat = np.exp(-dist / (70.0 * self.ore_scale))
-            r = np.maximum(r, (track + vapor) * heat * 0.8)
+            # Outer Tips: Ghostly Cyan/Blue (Harmonious with Emerald)
+            r_out = track * 0.1 + vapor * 0.05
+            g_out = track * 0.7 + vapor * 0.5
+            b_out = track * 1.0 + vapor * 0.9
+            
+            r = r_in * (1 - shift_mask) + r_out * shift_mask
+            g = g_in * (1 - shift_mask) + g_out * shift_mask
+            b = b_in * (1 - shift_mask) + b_out * shift_mask
+            
+            # Sub-bass core heat (Red-shifted green)
+            heat = np.exp(-dist / (60.0 * self.ore_scale))
+            r = np.maximum(r, (track + vapor) * heat * 0.9)
             rgb = np.stack([r, g, b], axis=-1)
+            
         elif style == "neon":
-            r = track * 1.0 + vapor * (0.5 + 0.5 * math.sin(self.time))
-            g = track * 0.5 + vapor * (0.5 + 0.5 * math.cos(self.time * 0.8))
-            b = track * 1.0 + vapor * 0.9
+            # Inner: Electric Magenta
+            # Cycle base hue slightly with time
+            hue_cycle = math.sin(self.time * 0.5) * 0.1
+            
+            r_in = track * 1.0 + vapor * (0.8 + hue_cycle)
+            g_in = track * 0.2 + vapor * 0.1
+            b_in = track * 0.9 + vapor * 0.7
+            
+            # Outer Tips: Deep Violet/Electric Blue
+            r_out = track * 0.4 + vapor * 0.2
+            g_out = track * 0.1 + vapor * 0.05
+            b_out = track * 1.0 + vapor * 1.0
+            
+            r = r_in * (1 - shift_mask) + r_out * shift_mask
+            g = g_in * (1 - shift_mask) + g_out * shift_mask
+            b = b_in * (1 - shift_mask) + b_out * shift_mask
             rgb = np.stack([r, g, b], axis=-1)
+            
         else: # lab / noir
             val = np.clip(track * 1.2 + vapor * 0.6, 0, 1)
-            if style == "noir": val = np.power(val, 1.4)
-            rgb = np.stack([val, val, val], axis=-1)
+            if style == "noir": 
+                val = np.power(val, 1.5)
+                # Noir gets a subtle blue tint at the tips for "cold" radioactivity
+                r = val * (1 - shift_mask * 0.2)
+                g = val * (1 - shift_mask * 0.1)
+                b = val
+                rgb = np.stack([r, g, b], axis=-1)
+            else:
+                rgb = np.stack([val, val, val], axis=-1)
             
         return (np.clip(rgb, 0, 1) * 255).astype(np.uint8)
 
