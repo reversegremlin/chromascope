@@ -1,5 +1,8 @@
-# PRD: chromascope-decay
+# Chromascope Decay: PRD & Specification
+## "Radioactive Cloud Chamber" Audio-Reactive Renderer
 
+### 1. Vision
+An organic, high-energy particle simulation that translates music into a radioactive decay field. It mimics the aesthetics of a Wilson Cloud Chamber but introduces a "Matter-Antimatter" sliding mirror architecture where two independent worlds collide and annihilate in the center.
 ## 1. Product Summary
 
 **Feature Name:** `chromascope-decay`  
@@ -154,123 +157,50 @@ Provide tuning packs:
 
 ---
 
-## 8. Technical Design Requirements
-
-### 8.1 Architecture
-
-Leverage existing pattern used by `chromascope-fractal`:
-
-1. **Analysis pass** (manifest generation at FPS)
-2. **Renderer pass** (frame synthesis from manifest)
-3. **Encoder pass** (stdin pipe to ffmpeg with audio mux)
-
-### 8.2 Performance Targets
-
-1. 1080p60 medium profile should process a 3-minute track within practical offline bounds (target: <= 1.5x realtime on reference dev machine).
-2. Memory should remain bounded by fixed-size buffers + particle pool (no unbounded list growth).
-3. Fast profile should permit short-iteration previews (`--max-duration 10`).
-
-### 8.3 Determinism and Stability
-
-1. Given same audio + same seed + same parameters, frame output is reproducible.
-2. Guardrails for extreme settings (clamp event counts, clamp blur kernel radius).
-3. No frame drops in offline render path.
+### 2. Core Physics: "The Smokey Engine"
+*   **Dual-Buffer Vapor:**
+    *   **Track Buffer:** Sharp, high-intensity lines representing the ionization paths.
+    *   **Vapor Buffer:** Diffuse, persistent smoke that drifts and distorts over time.
+*   **Particle Types:**
+    *   **Alpha:** Short, thick, slow. Starts with a high-velocity kick and suffers heavy drag (0.88).
+    *   **Beta:** Long, thin, fast. Maintains speed (0.98 drag) and creates sweeping arcs.
+    *   **Gamma:** Sparse flashes and point-events (speckles).
+*   **Drag Dynamics:** All particles obey a friction-based decay law, causing them to "smoke out" as they lose energy.
 
 ---
 
-## 9. Data Contract Additions (Manifest Usage)
-
-No mandatory schema break required; `chromascope-decay` consumes existing normalized features. Optional renderer-private derived channels may be computed at load time:
-
-- `decay_event_rate`
-- `decay_alpha_weight`
-- `decay_beta_weight`
-- `decay_burst_gain`
-- `decay_drift`
-
-If persisted, these should be additive, optional fields.
+### 3. Mirror Architecture: "Sliding Planes"
+*   **Symmetrical Opposites:** The visual is split into two independent simulations (Identity A and Identity B) that move in exactly opposite directions along a locked axis (Vertical, Horizontal, or Diagonal).
+*   **Centered Intersection:** All panning is centered on the screen's midpoint, ensuring that the "collision" always happens in the center.
+*   **Cinematic Motion:** Slow, sweeping pans (0.15 - 0.55 phase speed) driven by music energy.
+*   **Interference Modes:**
+    *   **Resonance:** Multiplicative overlap with a 12.0x intensity boost.
+    *   **Constructive:** Additive merging.
+    *   **Destructive:** Difference-based annihilation.
+    *   **Sweet Spot:** Max-based merging with resonance "sparking" in the center.
 
 ---
 
-## 10. Quality and Validation Plan
-
-### 10.1 Synchronization Checks
-
-1. Validate beat burst alignment against onset/beat frames.
-2. Spot-check frame indices at major transients (intro drop, chorus entry).
-
-### 10.2 Visual QA
-
-1. Confirm alpha trails read as short/thick and beta as long/thin.
-2. Confirm trails fade naturally without stepping artifacts.
-3. Confirm low-energy songs still produce subtle living background activity.
-
-### 10.3 Regression and Performance
-
-1. Add renderer unit tests for:
-   - deterministic seed behavior
-   - parameter clamping
-   - frame buffer shape/type invariants
-2. Add smoke tests for:
-   - CLI invocation
-   - 3–10 second preview render
+### 4. Coloring: "Matter-Antimatter Annihilation"
+*   **Dynamic Harmony:** Uses triadic offsets to shift trail "tips" based on their distance to the nearest ore.
+*   **Annihilation Palette:** When Simulation A and B overlap, the color engine detects the collision mask and triggers a high-contrast shift to **Cyan / Magenta / White-Hot**.
+*   **White-Hot Core:** Particle tracks in the overlap zone are boosted to brilliant white, simulating an annihilation reaction.
 
 ---
 
-## 11. Milestones
-
-### M1: Spec + Skeleton
-
-- CLI command scaffold
-- renderer module skeleton
-- parameter schema and defaults
-
-### M2: Core Visual Engine
-
-- particle spawn model
-- trail buffers + decay/diffusion
-- baseline grayscale output
-
-### M3: Audio Reactivity
-
-- mapping channels from manifest
-- beat burst behavior
-- alpha/beta balancing
-
-### M4: Art Direction + Presets
-
-- style presets
-- glow/tone mapping polish
-- documentation and examples
-
-### M5: Validation + Release
-
-- tests and perf checks
-- sample outputs
-- rollout in docs and README
+### 5. CLI & Controls
+*   `--style`: `uranium` (green/yellow), `neon` (blue/pink), `noir` (B&W).
+*   `--mirror`: `vertical`, `horizontal`, `diagonal`, `circular`, `cycle`.
+*   `--interference`: `resonance`, `constructive`, `destructive`, `sweet_spot`, `cycle`.
+*   `--vapor-persistence`: Controls how long the smoke lingers (0.90 - 0.99).
+*   `--distortion`: Controls the intensity of the "heat shimmer" vapor warp.
 
 ---
 
-## 12. Risks and Mitigations
-
-1. **Risk:** Visual clutter at high-energy songs.  
-   **Mitigation:** Hard cap concurrent events + adaptive thinning.
-2. **Risk:** Over-randomized output feels disconnected from music.  
-   **Mitigation:** Tie stochastic sampling strictly to feature-derived lambda and beat envelopes.
-3. **Risk:** Performance degradation from heavy blur/bloom at 4k.  
-   **Mitigation:** multi-resolution buffers and quality-dependent kernel sizes.
-
----
-
-## 13. Success Metrics
-
-1. Users can generate a finished decay video with a single command.
-2. Internal QA rates synchronization quality as "good or better" on curated test tracks.
-3. Render stability: no crashes across supported profiles on reference audio set.
-4. Aesthetic acceptance: at least one preset considered "production ready" by project maintainers.
-
----
-
+### 6. Technical Implementation
+*   **Sub-Pixel Shifting:** Uses Bilinear Interpolation (`map_coordinates`) to ensure 100% jitter-free motion.
+*   **Independent Seeds:** Every mirrored instance uses its own local `Random` and `np.random.Generator` states (Seeds: 42 and 1337).
+*   **Coordinate Wrapping:** Motion utilizes "Wrap" mode, ensuring the screen is always filled even during large sweeps.
 ## 14. Open Questions
 
 1. Should `chromascope-decay` default to monochrome (`lab`) or stylized (`uranium`) palette?
