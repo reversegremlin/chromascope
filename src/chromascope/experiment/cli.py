@@ -13,6 +13,7 @@ from typing import Type
 import numpy as np
 
 from chromascope.experiment.base import BaseConfig
+from chromascope.experiment.chemical import ChemicalConfig, ChemicalRenderer
 from chromascope.experiment.decay import DecayConfig, DecayRenderer
 from chromascope.experiment.encoder import encode_video
 from chromascope.experiment.fractal import FractalConfig, FractalKaleidoscopeRenderer
@@ -22,7 +23,7 @@ from chromascope.pipeline import AudioPipeline
 
 
 @dataclass
-class MixedConfig(SolarConfig, DecayConfig, FractalConfig):
+class MixedConfig(SolarConfig, DecayConfig, FractalConfig, ChemicalConfig):
     """A catch-all config for heterogeneous mixing."""
     pass
 
@@ -54,7 +55,7 @@ def main():
     # Mode
     parser.add_argument(
         "--mode", type=str, default="fractal",
-        choices=["fractal", "solar", "decay", "mixed"],
+        choices=["fractal", "solar", "decay", "mixed", "chemical"],
         help="Visualization mode (default: fractal)"
     )
     
@@ -92,6 +93,35 @@ def main():
     # Limits
     parser.add_argument("--max-duration", type=float, default=None)
     parser.add_argument("--no-cache", action="store_true")
+
+    # Fractal-specific
+    parser.add_argument(
+        "--fractal-mode", type=str, default=None,
+        choices=["blend", "mandelbrot"],
+        help="Fractal texture mode when --mode fractal (default: blend)",
+    )
+
+    # Chemical-specific
+    parser.add_argument(
+        "--chem-style", type=str, default=None,
+        choices=["neon_lab", "plasma_beaker", "midnight_fluor", "synth_chem"],
+        help="Visual style preset when --mode chemical (default: neon_lab)",
+    )
+    parser.add_argument("--reaction-gain", type=float, default=None,
+                        help="Reaction front intensity [0–2]")
+    parser.add_argument("--crystal-rate", type=float, default=None,
+                        help="Crystal growth speed [0–2]")
+    parser.add_argument("--nucleation-threshold", type=float, default=None,
+                        help="Percussive sensitivity for crystal seeding [0–1]")
+    parser.add_argument("--supersaturation", type=float, default=None,
+                        help="Baseline branching propensity [0–1]")
+    parser.add_argument("--bloom", type=float, default=None,
+                        help="Post-glow multiplier [0–2]")
+    parser.add_argument(
+        "--chem-palette", type=str, default=None,
+        choices=["iron", "copper", "sodium", "potassium", "mixed"],
+        help="Chemistry-inspired colour palette (default: mixed)",
+    )
 
     # Preview
     parser.add_argument(
@@ -138,8 +168,11 @@ def main():
     elif args.mode == "decay":
         config_cls = DecayConfig
         viz_cls_a = DecayRenderer
+    elif args.mode == "chemical":
+        config_cls = ChemicalConfig
+        viz_cls_a = ChemicalRenderer
     elif args.mode == "mixed":
-        config_cls = MixedConfig 
+        config_cls = MixedConfig
         viz_cls_a = SolarRenderer
         viz_cls_b = DecayRenderer
         if not palette: palette = "solar"
@@ -147,7 +180,7 @@ def main():
         config_cls = BaseConfig
         viz_cls_a = FractalKaleidoscopeRenderer
 
-    config = config_cls(
+    config_kwargs = dict(
         width=width,
         height=height,
         fps=fps,
@@ -157,8 +190,26 @@ def main():
         palette_type=palette or "jewel",
         mirror_mode=args.mirror,
         interference_mode=args.interference,
-        low_res_mirror=not args.no_low_res_mirror
+        low_res_mirror=not args.no_low_res_mirror,
     )
+    if args.mode == "fractal" and args.fractal_mode is not None:
+        config_kwargs["fractal_mode"] = args.fractal_mode
+    if args.mode == "chemical":
+        if args.chem_style is not None:
+            config_kwargs["style"] = args.chem_style
+        if args.reaction_gain is not None:
+            config_kwargs["reaction_gain"] = args.reaction_gain
+        if args.crystal_rate is not None:
+            config_kwargs["crystal_rate"] = args.crystal_rate
+        if args.nucleation_threshold is not None:
+            config_kwargs["nucleation_threshold"] = args.nucleation_threshold
+        if args.supersaturation is not None:
+            config_kwargs["supersaturation"] = args.supersaturation
+        if args.bloom is not None:
+            config_kwargs["bloom"] = args.bloom
+        if args.chem_palette is not None:
+            config_kwargs["chem_palette"] = args.chem_palette
+    config = config_cls(**config_kwargs)
 
     if args.mirror != "off":
         renderer = UniversalMirrorCompositor(viz_cls_a, config, viz_class_b=viz_cls_b)
