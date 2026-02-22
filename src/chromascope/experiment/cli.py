@@ -159,6 +159,10 @@ def main():
         "--pitch-color-strength", type=float, default=None,
         help="How boldly the dominant chord note shifts palette hue (default: 0.5)",
     )
+    parser.add_argument(
+        "--splat-radius", type=float, default=None,
+        help="Per-particle gaussian disc sigma in pixels (default: 2.0); larger = smoother/softer",
+    )
 
     # Preview
     parser.add_argument(
@@ -251,6 +255,8 @@ def main():
             config_kwargs["beat_flash_strength"] = args.beat_flash_strength
         if args.pitch_color_strength is not None:
             config_kwargs["pitch_color_strength"] = args.pitch_color_strength
+        if args.splat_radius is not None:
+            config_kwargs["splat_radius"] = args.splat_radius
     if args.mode == "chemical":
         if args.chem_style is not None:
             config_kwargs["style"] = args.chem_style

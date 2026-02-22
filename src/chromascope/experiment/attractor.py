@@ -212,6 +212,47 @@ if _NUMBA_OK:
                     accum[yi, xi, 1] += gi * w
                     accum[yi, xi, 2] += bi * w
 
+    @_numba.njit(cache=True)  # type: ignore[misc]
+    def _splat_soft_kernel(
+        x_arr: np.ndarray,
+        y_arr: np.ndarray,
+        r_arr: np.ndarray,
+        g_arr: np.ndarray,
+        b_arr: np.ndarray,
+        weight_arr: np.ndarray,
+        accum: np.ndarray,
+        H: int,
+        W: int,
+        splat_sigma: float,
+    ) -> None:
+        """Gaussian-disc scatter: each particle deposits a soft circular footprint.
+
+        Serial over particles (safe for accumulation without atomics).
+        Kernel radius = ceil(2.5 * sigma) pixels; weights fall off as exp(-r²/2σ²).
+        """
+        N = x_arr.shape[0]
+        r = int(math.ceil(splat_sigma * 2.5))
+        inv2sig2 = 0.5 / (splat_sigma * splat_sigma)
+        for i in range(N):
+            xi = int(math.floor(x_arr[i] + 0.5))
+            yi = int(math.floor(y_arr[i] + 0.5))
+            ri = r_arr[i] * weight_arr[i]
+            gi = g_arr[i] * weight_arr[i]
+            bi = b_arr[i] * weight_arr[i]
+            for dy in range(-r, r + 1):
+                yw = yi + dy
+                if yw < 0 or yw >= H:
+                    continue
+                dy2 = float(dy * dy)
+                for dx in range(-r, r + 1):
+                    xw = xi + dx
+                    if xw < 0 or xw >= W:
+                        continue
+                    g = math.exp(-(dy2 + float(dx * dx)) * inv2sig2)
+                    accum[yw, xw, 0] += ri * g
+                    accum[yw, xw, 1] += gi * g
+                    accum[yw, xw, 2] += bi * g
+
 
 # ---------------------------------------------------------------------------
 # NumPy fallbacks (always defined, used when Numba is unavailable)
@@ -336,6 +377,44 @@ def _splat_glow_numpy(
             )
 
 
+def _splat_soft_numpy(
+    x_arr: np.ndarray,
+    y_arr: np.ndarray,
+    r_arr: np.ndarray,
+    g_arr: np.ndarray,
+    b_arr: np.ndarray,
+    weight_arr: np.ndarray,
+    accum: np.ndarray,
+    H: int,
+    W: int,
+    splat_sigma: float,
+) -> None:
+    """Gaussian-disc scatter (NumPy fallback for _splat_soft_kernel)."""
+    r = int(math.ceil(splat_sigma * 2.5))
+    inv2sig2 = 0.5 / (splat_sigma * splat_sigma)
+    xi = np.round(x_arr).astype(np.int64)
+    yi = np.round(y_arr).astype(np.int64)
+    rgb = np.stack(
+        [r_arr * weight_arr, g_arr * weight_arr, b_arr * weight_arr], axis=1
+    ).astype(np.float32)
+
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            g = math.exp(-(dx * dx + dy * dy) * inv2sig2)
+            if g < 1e-6:
+                continue
+            xw = xi + dx
+            yw = yi + dy
+            valid = (xw >= 0) & (xw < W) & (yw >= 0) & (yw < H)
+            if not np.any(valid):
+                continue
+            np.add.at(
+                accum,
+                (yw[valid], xw[valid]),
+                rgb[valid] * float(g),
+            )
+
+
 # ---------------------------------------------------------------------------
 # Module-level dispatch: call Numba kernels if available, else NumPy
 # ---------------------------------------------------------------------------
@@ -374,6 +453,22 @@ if _NUMBA_OK:
     ) -> None:
         _splat_glow_kernel(x_arr, y_arr, r_arr, g_arr, b_arr, weight_arr, accum, H, W)
 
+    def splat_soft(
+        x_arr: np.ndarray,
+        y_arr: np.ndarray,
+        r_arr: np.ndarray,
+        g_arr: np.ndarray,
+        b_arr: np.ndarray,
+        weight_arr: np.ndarray,
+        accum: np.ndarray,
+        H: int,
+        W: int,
+        splat_sigma: float,
+    ) -> None:
+        _splat_soft_kernel(
+            x_arr, y_arr, r_arr, g_arr, b_arr, weight_arr, accum, H, W, splat_sigma
+        )
+
 else:  # pragma: no cover
 
     def rk4_lorenz(pts, sigma, rho, beta, dt, substeps):  # type: ignore[misc]
@@ -384,6 +479,11 @@ else:  # pragma: no cover
 
     def splat_glow(x_arr, y_arr, r_arr, g_arr, b_arr, weight_arr, accum, H, W):  # type: ignore[misc]
         _splat_glow_numpy(x_arr, y_arr, r_arr, g_arr, b_arr, weight_arr, accum, H, W)
+
+    def splat_soft(x_arr, y_arr, r_arr, g_arr, b_arr, weight_arr, accum, H, W, splat_sigma):  # type: ignore[misc]
+        _splat_soft_numpy(
+            x_arr, y_arr, r_arr, g_arr, b_arr, weight_arr, accum, H, W, splat_sigma
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -411,8 +511,9 @@ class AttractorConfig(BaseConfig):
 
     # Visuals
     attractor_palette: str = "neon_aurora"
-    glow_radius: float = 1.5       # sigma for gaussian bloom pass (overrides BaseConfig int)
-    particle_brightness: float = 1.2  # HDR exposure multiplier
+    glow_radius: float = 2.0       # sigma for gaussian bloom pass (overrides BaseConfig int)
+    particle_brightness: float = 1.5  # HDR exposure multiplier
+    splat_radius: float = 2.0      # per-particle gaussian disc sigma (px); 0 = bilinear fallback
 
     # Audio responsiveness
     audio_sensitivity: float = 1.0    # global multiplier for all audio effects
@@ -780,7 +881,7 @@ class AttractorRenderer(BaseVisualizer):
             self.cfg.particle_brightness * brightness_mult * (0.3 + 0.7 * z_depth)
         ).astype(np.float32)
 
-        splat_glow(
+        splat_soft(
             x_px.astype(np.float64),
             y_px.astype(np.float64),
             rgb[:, 0],
@@ -790,6 +891,7 @@ class AttractorRenderer(BaseVisualizer):
             self._accum,
             H,
             W,
+            float(self.cfg.splat_radius),
         )
 
     # ------------------------------------------------------------------
@@ -959,12 +1061,13 @@ class AttractorRenderer(BaseVisualizer):
             weights = (
                 self.cfg.particle_brightness * bm * (0.3 + 0.7 * z_depth)
             ).astype(np.float32)
-            splat_glow(
+            splat_soft(
                 x_px.astype(np.float64),
                 y_px.astype(np.float64),
                 rgb[:, 0], rgb[:, 1], rgb[:, 2],
                 weights,
                 self._accum, H, W,
+                float(self.cfg.splat_radius),
             )
 
     def get_raw_field(self) -> np.ndarray:
@@ -974,28 +1077,53 @@ class AttractorRenderer(BaseVisualizer):
     def render_frame(
         self, frame_data: Dict[str, Any], frame_index: int
     ) -> np.ndarray:
-        """Override: HDR bloom + Reinhard tone-map → uint8.
+        """Override: multi-scale bloom + ACES filmic tone-map + saturation boost.
 
-        Beat flash drives bloom expansion (larger, more diffuse glow on hits)
-        and HDR exposure boost.  Chromatic aberration spikes on percussion.
-        Vignette relaxes on beats so the scene opens up.
+        Multi-scale bloom: tight core glow + mid halo + wide corona, all
+        beat-flash responsive.  ACES filmic curve replaces Reinhard for richer
+        midtones and more natural highlight roll-off.  A luma-preserving
+        saturation multiply (~+30%) makes neon colours pop.
         """
         self.update(frame_data)
 
-        # Bloom: on beats the gaussian widens for a cinematic white-hot flash
+        # ── Multi-scale bloom pyramid ──────────────────────────────────────
+        # Three overlapping gaussian radii produce: glowing core → soft halo
+        # → wide cinematic corona.  Beat flash expands the outer two layers.
         glow_sigma = float(self.cfg.glow_radius)
-        bloom_sigma = glow_sigma * (1.0 + self._beat_flash * 0.7)
-        bloom = gaussian_filter(
-            self._accum, sigma=[bloom_sigma, bloom_sigma, 0]
+        flash = 1.0 + self._beat_flash * 0.7
+
+        b1 = gaussian_filter(self._accum, sigma=[glow_sigma, glow_sigma, 0])
+        b2 = gaussian_filter(
+            self._accum,
+            sigma=[glow_sigma * 3.0 * flash, glow_sigma * 3.0 * flash, 0],
         )
+        b3 = gaussian_filter(
+            self._accum,
+            sigma=[glow_sigma * 8.0 * flash, glow_sigma * 8.0 * flash, 0],
+        )
+        composite = self._accum + 0.7 * b1 + 0.4 * b2 + 0.15 * b3
 
-        composite = self._accum + bloom
-
-        # Reinhard HDR tone-map with beat-flash exposure boost
+        # ── ACES filmic tone-map ───────────────────────────────────────────
+        # Hill (2015) ACES approximation — richer than Reinhard at high
+        # exposures, preserves more colour in the midtones.
         exposure = self.cfg.particle_brightness * (1.0 + self._beat_flash * 0.8)
-        mapped = (composite * exposure) / (1.0 + composite * exposure)
+        x = composite * exposure
+        _a, _b, _c, _d, _e = 2.51, 0.03, 2.43, 0.59, 0.14
+        mapped = np.clip(
+            (x * (_a * x + _b)) / (x * (_c * x + _d) + _e), 0.0, 1.0
+        ).astype(np.float32)
 
-        out = np.clip(mapped * 255.0, 0, 255).astype(np.uint8)
+        # ── Luma-preserving saturation boost ──────────────────────────────
+        # Pull colours away from neutral grey by 30% — makes the neon palette
+        # vivid rather than pastel.
+        lum = (
+            0.2126 * mapped[..., 0]
+            + 0.7152 * mapped[..., 1]
+            + 0.0722 * mapped[..., 2]
+        )[..., np.newaxis]
+        mapped = np.clip(lum + 1.3 * (mapped - lum), 0.0, 1.0)
+
+        out = (mapped * 255.0).astype(np.uint8)
 
         # Vignette relaxes on beats — the world opens up at the drop
         if self.cfg.vignette_strength > 0:
