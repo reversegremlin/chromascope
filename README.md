@@ -1,90 +1,100 @@
 # Chromascope: The Geometry of Sound
 
-Chromascope is a mathematical sandbox where music becomes visual form. It is built on the principle that harmony is simply audible geometry, and geometry is frozen music. By decomposing audio into its fundamental harmonic and percussive components, Chromascope extracts the "visual drivers" that animate complex simulations—from fluid dynamics to sacred geometry.
+Chromascope is where **math, harmonics, and chroma** become living motion.
+It is a visual instrument powered by a distinctive audio-to-visual engine: music is decomposed, interpreted, polished, and translated into frame-accurate visual control signals that can drive many renderers.
 
 ![Chromascope Teaser](docs/assets/preview.gif)
 
 ---
 
-## 🎵 The Audio Engine: Decomposing the Waveform
+## Why Chromascope Feels Different
 
-The heart of Chromascope is its high-fidelity audio analysis library. Unlike simple FFT-based visualizers, Chromascope uses **Harmonic-Percussive Source Separation (HPSS)** to isolate the different roles of a soundscape.
+Most music visualizers map raw FFT bins straight to pixels.
+Chromascope is built around a stronger idea: a **manifest-first engine design**.
 
-- **Percussive Components:** Isolated drum hits and transients drive "impact" visuals, physics impulses, and sudden geometric shifts.
-- **Harmonic Components:** Melodic and chordal structures drive "flow" visuals, color palettes, and rotation speeds.
-- **Visual Drivers:** The engine extracts a rich feature set used to parameterize the renderers:
-    - **Chroma (Pitch):** Maps musical notes directly to the color spectrum.
-    - **Spectral Flux:** Detects onset strength for rhythmic synchronization.
-    - **Frequency Bands:** Sub-bass, bass, mid-range, and brilliance drive different layers of depth and detail.
-    - **Spectral Flatness & Centroid:** Drives the "noisiness" or "brightness" of the visual textures.
+1. **Decompose** audio into harmonic and percussive roles.
+2. **Extract** meaningful musical features (rhythm, timbre, pitch, energy).
+3. **Polish** those features for smooth cinematic behavior.
+4. **Serialize** into a stable visual driver manifest any renderer can consume.
 
-```python
-# Example of extracting visual drivers in Python
-from chromascope.core.decomposer import AudioDecomposer
-from chromascope.core.analyzer import FeatureAnalyzer
-
-decomposer = AudioDecomposer()
-analyzer = FeatureAnalyzer(target_fps=60)
-
-# Separate harmonic and percussive layers
-decomposed = decomposer.decompose_file("audio.wav")
-# Extract all visual drivers
-features = analyzer.analyze(decomposed)
-```
+This gives you visuals that feel less like a scope and more like a choreography.
 
 ---
 
-## 🌐 Real-Time Exploration: The Web Interface
+## Visual Showcase
 
-The `frontend/` provides a high-performance JavaScript render engine for real-time interaction. It translates the extracted audio features into a variety of visual styles through a 2D Canvas pipeline.
+### Motion Studies
 
-| Style | Aesthetic | Driver Mapping |
-| :--- | :--- | :--- |
-| **Glass** | Prismatic refraction | Chroma → Hue; Brilliance → Reflection density |
-| **Circuit** | Hexagonal grid matrix | Flux → Data pulse; Mid-range → Grid stability |
-| **Fibonacci** | Sacred phyllotaxis | BPM → Growth rate; Harmonic → Spiral density |
-| **Mycelial** | Organic fungal growth | Sub-bass → Spore drift; Percussion → Growth nodes |
-
-### Running the Web Interface
-1. Navigate to the `frontend/` directory.
-2. Run the server: `python server.py`
-3. Open `http://localhost:8000` to explore the styles in real-time.
-
-![Circuit Style](docs/assets/demos/preview_circuit.gif) ![Glass Style](docs/assets/demos/preview_glass.gif)
-
----
-
-## 🔬 High-Fidelity Rendering: The Experiment Framework
-
-For cinematic output, the `src/chromascope/experiment/` framework offers a Python-based rendering pipeline. This framework leverages the same audio features but applies advanced post-processing and simulation models that exceed real-time capabilities.
-
-- **Unified Visual Polisher:** A post-processing engine that applies audio-reactive **Glow**, **Chromatic Aberration**, and **Soft Tone Mapping**.
-- **Specialized Simulations:**
-    - `attractor.py`: Chaotic Lorenz and Aizawa systems driven by bass energy.
-    - `decay.py`: Radioactive particle decay simulations where half-life is modulated by spectral flux.
-    - `solar.py`: Fluid solar flares reacting to high-frequency brilliance.
-
-### Video Generation CLI
-```bash
-# Generate a cinematic render using the Decay experiment
-chromascope-decay my_track.wav --output video.mp4 --style dark_nebula
-```
-
----
-
-## 🎨 Visual Styles Gallery
-
-| ![Fibonacci](docs/assets/demos/preview_fibonacci.png) | ![Flower](docs/assets/demos/preview_flower.png) | ![Geometric](docs/assets/demos/preview_geometric.png) |
+| Circuit | Glass | Flower |
 | :---: | :---: | :---: |
-| **Fibonacci** | **Flower** | **Geometric** |
+| ![Circuit demo](docs/assets/demos/preview_circuit.gif) | ![Glass demo](docs/assets/demos/preview_glass.gif) | ![Flower demo](docs/assets/demos/preview_flower.gif) |
 
-| ![Spiral](docs/assets/demos/preview_spiral.png) | ![Orrery](docs/assets/demos/preview_orrery.png) | ![Quark](docs/assets/demos/preview_quark.png) |
+| Fibonacci | Spiral | Geometric |
 | :---: | :---: | :---: |
-| **Spiral** | **Orrery** | **Quark** |
+| ![Fibonacci demo](docs/assets/demos/preview_fibonacci.gif) | ![Spiral demo](docs/assets/demos/preview_spiral.gif) | ![Geometric demo](docs/assets/demos/preview_geometric.gif) |
+
+### Style Gallery
+
+| Geometric | Orrery | Quark | Sacred |
+| :---: | :---: | :---: | :---: |
+| ![Geometric style](docs/assets/demos/preview_geometric.png) | ![Orrery style](docs/assets/demos/preview_orrery.png) | ![Quark style](docs/assets/demos/preview_quark.png) | ![Sacred style](docs/assets/demos/preview_sacred.png) |
+
+| DMT | Fluid | Mycelial | Circuit |
+| :---: | :---: | :---: | :---: |
+| ![DMT style](docs/assets/demos/preview_dmt.png) | ![Fluid style](docs/assets/demos/preview_fluid.png) | ![Mycelial style](docs/assets/demos/preview_mycelial.png) | ![Circuit style](docs/assets/demos/preview_circuit.png) |
 
 ---
 
-## 🛠 Getting Started
+## The Engine Architecture
+
+### Phase A — Harmonic/Percussive Separation
+HPSS splits the waveform into distinct musical roles:
+- **Percussive channel** drives impact, impulses, and transients.
+- **Harmonic channel** drives tonal flow, color, and sustained motion.
+
+### Phase B — Visual Driver Extraction
+Chromascope extracts frame-aligned controls such as:
+- Beat + onset timing
+- Harmonic/percussive/global energy
+- Multi-band energy (sub-bass → brilliance)
+- Chroma + dominant note
+- Spectral flux, centroid, flatness, rolloff, ZCR, MFCC timbre
+
+### Phase C — Signal Polishing
+Raw audio features are reshaped for aesthetics:
+- Attack/release envelopes
+- Normalization to `[0, 1]`
+- Optional BPM-adaptive envelope timing
+
+Result: less flicker, more continuity, better visual musicality.
+
+### Phase D — Manifest Contract
+All polished features are emitted as a versioned visual manifest with semantic primitives:
+- `impact`
+- `fluidity`
+- `brightness`
+- `pitch_hue`
+- `texture`
+- `sharpness`
+
+This lets real-time and offline renderers share the same musical control language.
+
+---
+
+## Build With It
+
+Chromascope supports both immediate exploration and cinematic export:
+
+- **Web Studio (`frontend/`)** for interactive style exploration.
+- **Python experiment renderers (`src/chromascope/experiment/`)** for high-fidelity offline output.
+
+The same audio analysis can drive both.
+
+![Chromascope Studio Screenshot](docs/assets/studio-screenshot.png)
+
+---
+
+## Quick Start
 
 ### Installation
 ```bash
@@ -93,12 +103,31 @@ cd chromascope
 pip install -e .
 ```
 
-### Quick Start
-To generate a basic audio-reactive manifest and preview it:
+### Generate an audio visual driver manifest
 ```bash
-chromascope path/to/audio.wav --preview
+chromascope path/to/audio.wav --output manifest.json
+```
+
+### Run the web interface
+```bash
+cd frontend
+python server.py
+# open http://localhost:8000
+```
+
+### Render a cinematic experiment
+```bash
+chromascope-decay my_track.wav --output video.mp4 --style dark_nebula
 ```
 
 ---
 
-*Chromascope: Where the math of music meets the geometry of light.*
+## Design Philosophy
+
+- **Beauty from structure:** rhythm, harmony, and timbre each have distinct visual roles.
+- **Manifest-first architecture:** analysis and rendering stay decoupled.
+- **Musical coherence over noisy reactivity:** polish signals before mapping.
+- **Modular by design:** each stage can evolve independently.
+
+Chromascope is not just audio-reactive graphics.
+It is a composable engine for turning sound into visual meaning.
