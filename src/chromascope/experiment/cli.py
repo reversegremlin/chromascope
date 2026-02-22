@@ -147,6 +147,18 @@ def main():
         choices=["neon_aurora", "plasma_coil", "void_fire", "quantum_foam"],
         help="Neon colour palette for attractor mode (default: neon_aurora)",
     )
+    parser.add_argument(
+        "--audio-sensitivity", type=float, default=None,
+        help="Global audio responsiveness multiplier (default: 1.0)",
+    )
+    parser.add_argument(
+        "--beat-flash-strength", type=float, default=None,
+        help="Peak brightness multiplier on beat (default: 3.0)",
+    )
+    parser.add_argument(
+        "--pitch-color-strength", type=float, default=None,
+        help="How boldly the dominant chord note shifts palette hue (default: 0.5)",
+    )
 
     # Preview
     parser.add_argument(
@@ -233,6 +245,12 @@ def main():
             config_kwargs["projection_speed"] = args.projection_speed
         if args.attractor_palette is not None:
             config_kwargs["attractor_palette"] = args.attractor_palette
+        if args.audio_sensitivity is not None:
+            config_kwargs["audio_sensitivity"] = args.audio_sensitivity
+        if args.beat_flash_strength is not None:
+            config_kwargs["beat_flash_strength"] = args.beat_flash_strength
+        if args.pitch_color_strength is not None:
+            config_kwargs["pitch_color_strength"] = args.pitch_color_strength
     if args.mode == "chemical":
         if args.chem_style is not None:
             config_kwargs["style"] = args.chem_style
