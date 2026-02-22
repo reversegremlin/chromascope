@@ -119,32 +119,6 @@ chromascope-decay my_track.wav --output video.mp4 --style dark_nebula
 ```
 
 ---
-
-
-## Mathematical Showcase Pack (Public-Domain Inspired)
-
-I added a small showcase pack centered on mathematically-structured classical ideas that are safe to use:
-
-- `docs/assets/showcase/audio/fibonacci_etude.wav` – Fibonacci-indexed arpeggios.
-- `docs/assets/showcase/audio/golden_ratio_canon.wav` – two-voice canon with a φ-scaled offset.
-- `docs/assets/showcase/audio/prime_pulse_chorale.wav` – chord voices gated by prime-number rhythms.
-
-Generate/rebuild these files with:
-
-```bash
-python scripts/generate_math_showcase_audio.py
-```
-
-### Visual Preview Pairings
-
-| Audio sample | Preview clip |
-|---|---|
-| Fibonacci Etude | ![Fibonacci visual preview](docs/assets/demos/preview_fibonacci.gif) |
-| Golden Ratio Canon | ![Sacred geometry visual preview](docs/assets/demos/preview_geometric.gif) |
-| Prime Pulse Chorale | ![Circuit visual preview](docs/assets/demos/preview_circuit.gif) |
-
----
-
 ## Design Principles
 
 - **Musical separation before mapping** (harmonic vs percussive roles)
