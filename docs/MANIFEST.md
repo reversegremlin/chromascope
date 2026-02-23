@@ -398,8 +398,10 @@ for (const frame of manifest.frames) {
 | Version | What's in it |
 |---|---|
 | `1.1` | energy, 7-band frequency, spectral texture, chroma, 6 primitives, beat/onset triggers |
-| `2.0` | + timbre_velocity, song structure (C2), pitch tracking (C3), key stability (C4), downbeat grid (C5), CQT bands opt-in (C6), spectral bandwidth (C7), onset shape (W4) |
+| `2.0` ✓ **current** | + timbre_velocity, song structure (C2), pitch tracking (C3), key stability (C4), downbeat grid (C5), CQT bands opt-in (C6), spectral bandwidth (C7), onset shape (W4) |
 | `3.0` *(planned)* | + stem energy (drums/bass/vocals/other), neural beats, chord identity + tension |
 | `4.0` *(planned)* | + CREPE pitch spectrum, per-section arousal/valence, MERT embedding |
 
 Manifests are cached by content hash at `~/.cache/chromascope/manifests/`. A schema version bump invalidates the cache; re-analysis runs automatically.
+
+See [SCHEMA_CHANGELOG.md](SCHEMA_CHANGELOG.md) for the full field-level diff, backward-compat guarantee, and cache invalidation details.
