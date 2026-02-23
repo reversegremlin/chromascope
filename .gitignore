@@ -76,6 +76,9 @@ coverage.xml
 .DS_Store (MacOS)
 Thumbs.db (Windows)
 
+# --- Node ---
+node_modules/
+
 # --- Logs ---
 *.log
 DEVLOG.md.bak
