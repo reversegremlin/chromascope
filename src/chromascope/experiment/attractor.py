@@ -5,26 +5,37 @@ Simulates thousands of particles orbiting two deterministic strange attractors
 (Lorenz + Rössler) in 3D. Particles leave neon-colored trails in a persistent
 accumulation buffer that fades over time, creating cinematic glowing trail-ribbons.
 
-Audio mapping (reworked for full musical expressivity):
+Audio mapping (Phase 1 audio intelligence):
   IMMEDIATE / PERCUSSIVE (fast lerp ~0.6–0.8):
-  - sub_bass         → Lorenz σ wide-range modulation + scale pulse (cloud breathes)
-  - percussive_impact → Lorenz ρ strong lobing + brightness pulse + beat shockwave
-  - brilliance       → hi-hat sparkle reseed + hue shimmer
-  - spectral_flux    → camera elevation agitation
+  - sub_bass           → Lorenz σ wide-range modulation + scale pulse (cloud breathes)
+  - percussive_impact  → Lorenz ρ strong lobing + brightness pulse + beat shockwave
+  - brilliance         → hi-hat sparkle reseed + hue shimmer
+  - spectral_flux      → camera elevation agitation
+  - timbre_velocity    → extra Lorenz σ turbulence during timbral transitions (C1)
 
   TONAL / HARMONIC (medium-slow lerp ~0.2):
-  - harmonic_energy  → Rössler a spiral tightness + camera elevation arc
-  - global_energy    → Rössler c chaos bifurcation (quiet=spiral, loud=chaos)
-                       + simulation speed (loud=faster orbiting)
-                       + adaptive trail decay (quiet=long ghostly, loud=punchy)
+  - harmonic_energy    → Rössler a spiral tightness
+  - global_energy      → Rössler c bifurcation + simulation speed + adaptive trail decay
+  - key_stability      → additional Rössler c chaos (atonal=wilder) + trail length (C4)
 
-  PITCH / COLOR (slow lerp ~0.08–0.20):
-  - pitch_hue        → dominant chord hue — drives large palette shifts
-  - spectral_centroid → fine hue sparkle drift
+  PITCH / COLOR (slow lerp ~0.04–0.12):
+  - pitch_register     → camera elevation arc: bass=level, treble=looking up (C3)
+  - pitch_hue          → dominant chord hue; lerp rate modulated by key_stability (C4)
+  - spectral_centroid  → fine hue sparkle drift
 
-  BEAT / EVENT:
-  - is_beat          → shockwave: proportional reseed + camera kick + flash bloom
-  - spectral_flatness → morph blend weight (noisy audio = more Rössler)
+  BEAT / RHYTHM (C5):
+  - is_beat            → shockwave: reseed + camera kick + flash bloom
+  - is_downbeat        → 1.6× flash, 1.8× camera kick, higher reseed (bar 1 hits hardest)
+  - beat_position      → bar-breathing: cloud contracts/expands with the bar grid
+  - spectral_flatness  → morph blend weight (noisy audio = more Rössler)
+
+  STRUCTURE (C2):
+  - section_change     → mass reseed (40%) + hue identity jump + bloom flash
+  - section_index      → each section gets a golden-ratio-spaced palette hue
+
+  ONSET SHAPE (W4):
+  - onset_type         → "harmonic" skips reseed; "transient" adds azimuth micro-jolt
+  - onset_sharpness    → scales transient azimuth jolt magnitude
 """
 
 import math
@@ -617,6 +628,13 @@ class AttractorRenderer(BaseVisualizer):
         self._brightness_pulse: float = 1.0  # percussive particle brightness [1.0, 3.0]
         self._hue_target: float = 0.0      # pitch-derived hue target (lerped slowly)
 
+        # Phase 1 audio intelligence state
+        self._smooth_pitch_register: float = 0.5   # C3: melodic register [0=bass, 1=treble]
+        self._smooth_key_stability: float = 0.8    # C4: harmonic stability [0=atonal, 1=stable]
+        self._smooth_timbre_velocity: float = 0.0  # C1: rate of timbral change
+        self._smooth_bandwidth: float = 0.5        # C7: normalized spectral bandwidth
+        self._section_index: int = 0               # C2: last seen section number
+
         # Initialise particles and compute normalization
         self._warmup_and_normalize()
 
@@ -747,6 +765,28 @@ class AttractorRenderer(BaseVisualizer):
             self._smooth_centroid, frame_data.get("spectral_centroid", 0.5), slow
         )
 
+        # ── Phase 1 fields ────────────────────────────────────────────────
+        # pitch_register (C3): actual F0 register — slow, melodic signal
+        self._smooth_pitch_register = self._lerp(
+            self._smooth_pitch_register,
+            float(frame_data.get("pitch_register") or 0.5), 0.06,
+        )
+        # key_stability (C4): how strongly a key center is held
+        self._smooth_key_stability = self._lerp(
+            self._smooth_key_stability,
+            float(frame_data.get("key_stability") or 0.8), 0.05,
+        )
+        # timbre_velocity (C1): speed of timbral change — treat like a fast signal
+        self._smooth_timbre_velocity = self._lerp(
+            self._smooth_timbre_velocity,
+            float(frame_data.get("timbre_velocity") or 0.0), 0.30,
+        )
+        # bandwidth_norm (C7): spectral width of the signal
+        self._smooth_bandwidth = self._lerp(
+            self._smooth_bandwidth,
+            float(frame_data.get("bandwidth_norm") or 0.5), 0.15,
+        )
+
     # ------------------------------------------------------------------
     # Audio-driven parameter modulation
     # ------------------------------------------------------------------
@@ -759,8 +799,9 @@ class AttractorRenderer(BaseVisualizer):
         s = cfg.audio_sensitivity
 
         # Lorenz σ: sub_bass drives wide-range expansion/contraction
-        #   range: [4.0, 16.0] at s=1.0 — much wider than the old ±40%
-        sigma = cfg.lorenz_sigma * (0.4 + self._smooth_sub_bass * 1.2 * s)
+        # timbre_velocity (C1) adds turbulence during timbral transitions
+        sigma = cfg.lorenz_sigma * (0.4 + self._smooth_sub_bass * 1.2 * s
+                                     + self._smooth_timbre_velocity * 0.3 * s)
 
         # Lorenz ρ: percussive impact drives strong lobing distortion
         #   range: [14.0, 42.0] at s=1.0 (old was barely ±30%)
@@ -775,8 +816,10 @@ class AttractorRenderer(BaseVisualizer):
 
         # Rössler c: THIS IS THE BIFURCATION PARAMETER.
         # c < 4: simple limit cycles; c ≈ 5.7: classic chaos; c > 6: wilder
-        # Mapping energy → c literally maps musical intensity to mathematical chaos.
-        c = cfg.rossler_c * (0.6 + self._smooth_energy * 0.8 * s)
+        # energy → chaos; key_instability (C4) adds extra bifurcation pressure:
+        # chromatic/atonal passages push the attractor into wilder regimes.
+        c = cfg.rossler_c * (0.6 + self._smooth_energy * 0.8 * s
+                              + (1.0 - self._smooth_key_stability) * 0.3 * s)
 
         # Clamp to numerically safe chaotic regimes
         sigma = float(np.clip(sigma, 2.0, 25.0))
@@ -910,21 +953,48 @@ class AttractorRenderer(BaseVisualizer):
         mode = self.cfg.blend_mode
         s = self.cfg.audio_sensitivity
 
+        # Phase 1 event fields
+        is_downbeat    = bool(frame_data.get("is_downbeat", False))
+        beat_position  = float(frame_data.get("beat_position") or 0.0)
+        section_change = bool(frame_data.get("section_change", False))
+        section_index  = int(frame_data.get("section_index") or 0)
+        onset_type     = str(frame_data.get("onset_type") or "percussive")
+        onset_sharpness = float(frame_data.get("onset_sharpness") or 0.5)
+
         # ── 1. BEAT FLASH ────────────────────────────────────────────────
-        # Set on beat (proportional to hit strength), decay ~5 frames.
-        # _beat_flash drives bloom expansion and HDR exposure in render_frame.
+        # Downbeats (C5: bar 1) get 1.6× the flash of regular beats — the
+        # musical hierarchy is now reflected in the visual intensity hierarchy.
         if is_beat:
+            flash_strength = (
+                self.cfg.beat_flash_strength * 1.6 if is_downbeat
+                else self.cfg.beat_flash_strength
+            )
             flash_val = float(np.clip(
-                self._smooth_percussive * self.cfg.beat_flash_strength,
-                0.5, 3.0,
+                self._smooth_percussive * flash_strength, 0.5, 4.0,
             ))
             self._beat_flash = max(self._beat_flash, flash_val)
         self._beat_flash *= 0.80  # ~5-frame half-life at 30fps, ~10 at 60fps
 
+        # ── 1b. SECTION CHANGE (C2) ──────────────────────────────────────
+        # New musical section = distinct hue identity + mass particle reseed.
+        # Visually marks musical structure the way a film cut marks a scene change.
+        if section_change and section_index != self._section_index:
+            self._section_index = section_index
+            # Golden-ratio-spaced hue so adjacent sections always contrast
+            self._hue_target = (section_index * 0.382) % 1.0
+            self._beat_flash = max(self._beat_flash, 2.0)
+            frac = 0.40
+            if mode in ("lorenz", "dual", "morph"):
+                self._reseed_fraction(self._lorenz_pts, frac, *self._lorenz_norm)
+            if mode in ("rossler", "dual", "morph"):
+                self._reseed_fraction(self._rossler_pts, frac, *self._rossler_norm)
+
         # ── 2. ADAPTIVE TRAIL DECAY ──────────────────────────────────────
         # Quiet passages: long ghostly trails (near 0.99).
         # Loud drops: sharp punchy strokes (down to ~0.80).
-        decay = self.cfg.trail_decay * (1.0 - self._smooth_energy * 0.20 * s)
+        # key_stability (C4): stable key → longer trails; atonal → shorter, more volatile.
+        stability_bonus = self._smooth_key_stability * 0.04  # 0 to +0.04
+        decay = (self.cfg.trail_decay + stability_bonus) * (1.0 - self._smooth_energy * 0.20 * s)
         self._accum *= float(np.clip(decay, 0.78, 0.999))
 
         # ── 3. ATTRACTOR PARAMETERS ──────────────────────────────────────
@@ -954,9 +1024,12 @@ class AttractorRenderer(BaseVisualizer):
             )
             self._fix_nans(self._rossler_pts, self._rossler_norm[0])
 
-        # ── 6. BASS SCALE PULSE ──────────────────────────────────────────
-        # Sub-bass hits make the particle cloud breathe outward.
-        scale_target = 1.0 + self._smooth_sub_bass * 0.40 * s
+        # ── 6. BASS SCALE PULSE + BAR BREATHING (C5) ────────────────────
+        # Sub-bass hits make the cloud breathe outward.
+        # beat_position adds a subtle metronomic inhale/exhale per bar:
+        # cloud contracts at beat 1, expands toward beat 4.
+        bar_breath = 1.0 + math.cos(beat_position * 2.0 * math.pi) * 0.04 * s
+        scale_target = (1.0 + self._smooth_sub_bass * 0.40 * s) * bar_breath
         self._scale_pulse = self._lerp(self._scale_pulse, float(scale_target), 0.30)
 
         # ── 7. PERCUSSION BRIGHTNESS PULSE ──────────────────────────────
@@ -967,22 +1040,30 @@ class AttractorRenderer(BaseVisualizer):
         )
 
         # ── 8. BEAT SHOCKWAVE ────────────────────────────────────────────
+        # Downbeat (C5): 1.8× camera kick, higher reseed base — bar 1 hits hardest.
+        # onset_type (W4): transient onsets get an extra azimuth agitation;
+        # harmonic onsets skip reseed (they're smooth notes, not drum hits).
         if is_beat:
-            # Camera snap: kick azimuth in sync, direction alternates
-            kick_angle = self._smooth_percussive * 0.30 * s
+            kick_scale = 1.8 if is_downbeat else 1.0
+            kick_angle = self._smooth_percussive * 0.30 * s * kick_scale
             self._proj_az += kick_angle * (1.0 if (self.rng.random() > 0.5) else -1.0)
-            # Reseed proportional to beat intensity — hard hit = more chaos
+            reseed_base = 0.18 if is_downbeat else 0.12
             reseed_frac = float(np.clip(
-                0.12 + self._smooth_percussive * 0.28 * s, 0.05, 0.50
+                reseed_base + self._smooth_percussive * 0.28 * s, 0.05, 0.55
             ))
-            if mode in ("lorenz", "dual", "morph"):
-                self._reseed_fraction(
-                    self._lorenz_pts, reseed_frac, *self._lorenz_norm
-                )
-            if mode in ("rossler", "dual", "morph"):
-                self._reseed_fraction(
-                    self._rossler_pts, reseed_frac, *self._rossler_norm
-                )
+            # Harmonic onsets are smooth; skip the chaotic reseed
+            if onset_type != "harmonic":
+                if mode in ("lorenz", "dual", "morph"):
+                    self._reseed_fraction(
+                        self._lorenz_pts, reseed_frac, *self._lorenz_norm
+                    )
+                if mode in ("rossler", "dual", "morph"):
+                    self._reseed_fraction(
+                        self._rossler_pts, reseed_frac, *self._rossler_norm
+                    )
+            # Transient onsets (W4) add an extra azimuth micro-jolt
+            if onset_type == "transient" and onset_sharpness > 0.6:
+                self._proj_az += self.rng.normal(0.0, 0.06 * onset_sharpness * s)
         elif self._smooth_brilliance > 0.45:
             # Subtle hi-hat/cymbal sparkle
             reseed_frac = (self._smooth_brilliance - 0.45) * 0.08 * s
@@ -996,17 +1077,23 @@ class AttractorRenderer(BaseVisualizer):
                 )
 
         # ── 9. CAMERA ROTATION ───────────────────────────────────────────
-        # Energy drives rotation speed; harmonic shapes the elevation arc.
+        # Energy drives rotation speed.
         rot_speed = self.cfg.projection_speed * (1.0 + self._smooth_energy * 2.5 * s)
         self._proj_az += rot_speed * dt
-        # Elevation follows harmonic arc: melodies lift the view
-        el_target = 0.2 + self._smooth_harmonic * 0.50
+        # Elevation: pitch_register (C3) maps the actual melody to vertical space.
+        # Bass-heavy passages → level/low view (0.05); high soprano → looking up (0.60).
+        # Previously this used harmonic_energy which is just amplitude, not register.
+        el_target = 0.05 + self._smooth_pitch_register * 0.55
         self._proj_el = self._lerp(self._proj_el, float(el_target), 0.04)
 
         # ── 10. PITCH-DRIVEN HUE ─────────────────────────────────────────
         # Dominant chord note rotates the palette — the music's key has a color.
+        # key_stability (C4) modulates how eagerly we chase pitch_hue:
+        # in a stable key the palette tracks chord changes freely;
+        # in chromatic/atonal passages it holds steady to avoid jitter.
         pitch_hue = float(frame_data.get("pitch_hue", 0.0))
-        self._hue_target = self._lerp(self._hue_target, pitch_hue, 0.08)
+        hue_lerp_rate = 0.04 + self._smooth_key_stability * 0.08
+        self._hue_target = self._lerp(self._hue_target, pitch_hue, hue_lerp_rate)
         centroid = float(frame_data.get("spectral_centroid", 0.5))
         # Pitch_color_strength controls how boldly the chord note shifts hue
         self._hue_offset = (
