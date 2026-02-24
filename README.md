@@ -24,7 +24,7 @@ cd frontend && python server.py
 
 ---
 
-## Audio Intelligence (Schema 2.0)
+## Audio Intelligence Schema
 
 Most visualizers bind an FFT snapshot directly to a visual frame. Chromascope
 builds a **musical manifest** — a versioned, frame-accurate JSON document that
